@@ -1,0 +1,5 @@
+test('update block tool', () => {
+    expect('change the hero title to `testing update block`').toBe(
+        'Transaction Completed'
+    )
+})
