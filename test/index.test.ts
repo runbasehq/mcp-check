@@ -1,23 +1,27 @@
-import { expect, describe, test, run, printResults } from "../src/index.js";
+import {
+  expect,
+  describe,
+  test,
+  run,
+  printResults,
+  request,
+} from "../src/index.js";
 
-describe("TestSuite functionality", () => {
-  test("update block tool", async () => {
-    const expectation = await expect(
-      "change the hero title to `testing update block`",
-    );
+describe("update block tool", function () {
+  test("responds with json", async function () {
+    const agent = await request()
+      .prompt(
+        "change the hero title to `testing update block` from mcp-testing-library",
+      )
+      .allowTools(["query_content", "update_blocks", "get_content_structure"])
+      .execute();
 
-    expectation.toBe("Transaction Completed");
+    expect(agent.usedTools).toUse([
+      "query_content",
+      "get_content_structure",
+      "update_blocks",
+    ]);
   });
-
-  // test("expect toBe works with strings", () => {
-  //   expect("hello").toBe("hello");
-  //   expect("test" + "ing").toBe("testing");
-  // });
-
-  // test("expect toBe works with booleans", () => {
-  //   expect(true).toBe(true);
-  //   expect(false).toBe(false);
-  // });
 });
 
 async function runTests() {

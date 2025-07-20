@@ -1,5 +1,9 @@
-test('update block tool', () => {
-    expect('change the hero title to `testing update block`').toBe(
-        'Transaction Completed'
-    )
-})
+describe('update block tool', function() {
+  it('responds with json', async function() {
+    const agent = await request(app)
+      .prompt('change the hero title to `testing update block`')
+      .allowTools(['query_content', 'update_block'])
+
+    expect(agent).toUse(['query_content', 'update_block'])
+  });
+});

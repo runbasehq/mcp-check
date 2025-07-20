@@ -1,6 +1,6 @@
-import { anthropic } from "@ai-sdk/anthropic";
-import { generateText, tool } from "ai";
-import { loadTools } from "./utils/load-tools";
+import Anthropic from "@anthropic-ai/sdk";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 interface TestResult {
   name: string;
@@ -14,6 +14,59 @@ interface SuiteResult {
   suites: SuiteResult[];
 }
 
+// let client: Client | undefined = undefined;
+// const baseUrl = new URL("http://127.0.0.1:3005/mcp");
+const anthropic = new Anthropic();
+
+export class Agent {
+  private promptText: string = "";
+  private allowedTools: string[] = [];
+  public usedTools: string[] = [];
+  private response: any = null;
+
+  prompt(text: string): this {
+    this.promptText = text;
+    return this;
+  }
+
+  allowTools(tools: string[]): this {
+    this.allowedTools = tools;
+    return this;
+  }
+
+  async execute(): Promise<this> {
+    const response = await anthropic.beta.messages.create({
+      model: "claude-3-5-sonnet-20240620",
+      max_tokens: 1000,
+      messages: [
+        {
+          role: "user",
+          content: this.promptText,
+        },
+      ],
+      mcp_servers: [
+        {
+          url: "https://basehub.com/api/mcp",
+          authorization_token: process.env.BASEHUB_TOKEN!,
+          name: "basehub-marketing-website",
+          type: "url",
+        },
+      ],
+      betas: ["mcp-client-2025-04-04"],
+    });
+
+    this.response = response;
+
+    this.usedTools = response.content
+      .filter((item: any) => item.type === "mcp_tool_use")
+      .map((item: any) => item.name);
+
+    console.log("Used tools:", this.usedTools);
+
+    return this;
+  }
+}
+
 export class Expectation {
   constructor(private actual: any) {}
 
@@ -23,26 +76,33 @@ export class Expectation {
     }
   }
 
-  expectedInput(expected: any): void {
-    if (this.actual !== expected) {
-      throw new Error(`Expected ${this.actual} to be ${expected}`);
+  toUse(expectedTools: string[]): void {
+    if (!Array.isArray(this.actual)) {
+      throw new Error(
+        `Expected an array of used tools, got ${typeof this.actual}`,
+      );
     }
+
+    const usedTools = this.actual as string[];
+
+    for (const tool of expectedTools) {
+      if (!usedTools.includes(tool)) {
+        throw new Error(
+          `Expected tool '${tool}' to be used, but it wasn't. Used tools: ${usedTools.join(", ")}`,
+        );
+      }
+    }
+
+    console.log(`✓ All expected tools were used: ${expectedTools.join(", ")}`);
   }
 }
 
-export async function expect(prompt: string): Promise<Expectation> {
-  const tools = await loadTools();
+export function request(app?: any): Agent {
+  return new Agent();
+}
 
-  const { text } = await generateText({
-    model: anthropic("claude-3-haiku-20240307"),
-    tools,
-    prompt,
-  });
-
-  console.log("seeing tools", JSON.stringify(tools));
-  // console.log("response", text);
-
-  return new Expectation("Transaction Completed");
+export function expect(actual: any): Expectation {
+  return new Expectation(actual);
 }
 
 export class TestSuite {
