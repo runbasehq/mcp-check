@@ -1,27 +1,20 @@
 {
   "name": "mcp-testing-library",
-  "module": "index.ts",
-  "type": "module",
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.56.0",
-    "@modelcontextprotocol/sdk": "^1.16.0",
-    "bun-plugin-dts": "^0.3.0",
-    "zod": "^3.24.4"
-  },
-  "description": "",
-  "exports": {
-    "types": "./dist/index.d.ts",
-    "import": "./dist/index.js",
-    "require": "./dist/index.cjs"
-  },
+  "private": true,
   "scripts": {
-    "build": "bun run build.ts",
-    "prepublishOnly": "bun run build"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.5",
+    "typescript": "5.8.3"
+  },
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=20"
   }
 }
