@@ -1,5 +1,5 @@
 {
-  "name": "mcp-testing-library",
+  "name": "mcp-check-monorepo",
   "private": true,
   "scripts": {
     "build": "turbo run build",

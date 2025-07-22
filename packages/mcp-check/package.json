@@ -1,8 +1,10 @@
 {
-  "name": "mcp-testing-library",
+  "name": "mcp-check",
   "module": "index.ts",
   "version": "0.0.1",
   "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -17,12 +19,17 @@
   },
   "description": "",
   "exports": {
-    "types": "./dist/index.d.ts",
-    "import": "./dist/index.js",
-    "require": "./dist/index.cjs"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
   },
   "scripts": {
     "build": "tsup",
     "prepublishOnly": "bun run build"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }
