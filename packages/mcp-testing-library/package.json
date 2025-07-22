@@ -22,7 +22,7 @@
     "require": "./dist/index.cjs"
   },
   "scripts": {
-    "build": "bun run build.ts",
+    "build": "tsup",
     "prepublishOnly": "bun run build"
   }
 }
