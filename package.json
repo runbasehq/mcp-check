@@ -7,8 +7,9 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
-    "release": "pnpm build && pnpm changeset publish",
-    "version": "pnpm changeset version"
+    "version": "pnpm changeset version",
+    "version:packages": "pnpm changeset version",
+    "release": "pnpm build && pnpm changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.5",
