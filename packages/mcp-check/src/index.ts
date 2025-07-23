@@ -77,13 +77,7 @@ export class Expectation {
   }
 
   toUse(expectedTools: string[]): void {
-    if (!Array.isArray(this.actual)) {
-      throw new Error(
-        `Expected an array of used tools, got ${typeof this.actual}`,
-      );
-    }
-
-    const usedTools = this.actual as string[];
+    const usedTools = this.actual.usedTools as string[];
 
     for (const tool of expectedTools) {
       if (!usedTools.includes(tool)) {
@@ -94,6 +88,26 @@ export class Expectation {
     }
 
     console.log(`✓ All expected tools were used: ${expectedTools.join(", ")}`);
+  }
+
+  toBeCalledTimes(tool: string, times: number): void {
+    const usedTools = this.actual.usedTools as string[];
+
+    const timesUsed = usedTools.reduce((acc, current) => {
+      if (current === tool) {
+        return acc + 1;
+      }
+
+      return acc;
+    }, 0);
+
+    if (timesUsed !== times) {
+      throw new Error(
+        `Expected tool '${tool}' to be called ${times} times, but it was called ${timesUsed} times`,
+      );
+    }
+
+    console.log(`✓ Tool '${tool}' was called ${times} times as expected`);
   }
 }
 
