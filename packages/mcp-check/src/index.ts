@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Agents, McpServer } from "@mcp-check/agents"
 
 interface TestResult {
   name: string;
@@ -14,61 +15,8 @@ interface SuiteResult {
   suites: SuiteResult[];
 }
 
-// let client: Client | undefined = undefined;
-// const baseUrl = new URL("http://127.0.0.1:3005/mcp");
-const anthropic = new Anthropic();
-
-export class Agent {
-  private promptText: string = "";
-  private allowedTools: string[] = [];
-  public usedTools: string[] = [];
-  private response: any = null;
-
-  prompt(text: string): this {
-    this.promptText = text;
-    return this;
-  }
-
-  allowTools(tools: string[]): this {
-    this.allowedTools = tools;
-    return this;
-  }
-
-  async execute(): Promise<this> {
-    const response = await anthropic.beta.messages.create({
-      model: "claude-3-5-sonnet-20240620",
-      max_tokens: 1000,
-      messages: [
-        {
-          role: "user",
-          content: this.promptText,
-        },
-      ],
-      mcp_servers: [
-        {
-          url: "https://basehub.com/api/mcp",
-          authorization_token: process.env.BASEHUB_TOKEN!,
-          name: "basehub-marketing-website",
-          type: "url",
-        },
-      ],
-      betas: ["mcp-client-2025-04-04"],
-    });
-
-    this.response = response;
-
-    this.usedTools = response.content
-      .filter((item: any) => item.type === "mcp_tool_use")
-      .map((item: any) => item.name);
-
-    console.log("Used tools:", this.usedTools);
-
-    return this;
-  }
-}
-
 export class Expectation {
-  constructor(private actual: any) {}
+  constructor(private actual: any) { }
 
   toBe(expected: any): void {
     if (this.actual !== expected) {
@@ -77,12 +25,13 @@ export class Expectation {
   }
 
   toUse(expectedTools: string[]): void {
-    const usedTools = this.actual.usedTools as string[];
+    const usedToolsDict = this.actual.usedTools as Record<string, string[]>;
+    const allUsedTools = Object.values(usedToolsDict).flat();
 
     for (const tool of expectedTools) {
-      if (!usedTools.includes(tool)) {
+      if (!allUsedTools.includes(tool)) {
         throw new Error(
-          `Expected tool '${tool}' to be used, but it wasn't. Used tools: ${usedTools.join(", ")}`,
+          `Expected tool '${tool}' to be used, but it wasn't. Used tools: ${allUsedTools.join(", ")}`,
         );
       }
     }
@@ -91,9 +40,10 @@ export class Expectation {
   }
 
   toBeCalledTimes(tool: string, times: number): void {
-    const usedTools = this.actual.usedTools as string[];
+    const usedToolsDict = this.actual.usedTools as Record<string, string[]>;
+    const allUsedTools = Object.values(usedToolsDict).flat();
 
-    const timesUsed = usedTools.reduce((acc, current) => {
+    const timesUsed = allUsedTools.reduce((acc, current) => {
       if (current === tool) {
         return acc + 1;
       }
@@ -111,9 +61,6 @@ export class Expectation {
   }
 }
 
-export function request(app?: any): Agent {
-  return new Agent();
-}
 
 export function expect(actual: any): Expectation {
   return new Expectation(actual);
