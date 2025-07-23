@@ -1,15 +1,22 @@
+import { client, McpServer } from "@mcp-check/agents";
 import {
   expect,
   describe,
   test,
   run,
   printResults,
-  request,
 } from "../src/index.js";
+
+const mcpServer = new McpServer({
+  url: "https://mcp.deepwiki.com/mcp",
+  authorizationToken: process.env.BASEHUB_TOKEN!,
+  name: "basehub-marketing-website",
+  type: "url",
+});
 
 describe("update block tool", function () {
   test("should use update block tools", async function () {
-    const agent = await request()
+    const agent = await client(mcpServer, ["gpt-4o"])
       .prompt(
         "change the hero title to `testing update block` from mcp-testing-library",
       )

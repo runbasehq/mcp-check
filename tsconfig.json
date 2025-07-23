@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@mcp-check/agents": [
+        "packages/agents"
+      ]
+    }
+  }
+}
