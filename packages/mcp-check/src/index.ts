@@ -1,3 +1,5 @@
+export { client, McpServer } from "@mcp-check/agents";
+
 interface TestResult {
   name: string;
   passed: boolean;
@@ -10,7 +12,7 @@ interface SuiteResult {
   suites: SuiteResult[];
 }
 
-export class Expectation {
+class Expectation {
   constructor(private actual: any) {}
 
   toBe(expected: any): void {
@@ -60,8 +62,8 @@ export function expect(actual: any): Expectation {
   return new Expectation(actual);
 }
 
-export class TestSuite {
-  private tests: Array<{ name: string; fn: () => void }> = [];
+class TestSuite {
+  private tests: Array<{ name: string; fn: () => void | Promise<void> }> = [];
   private suites: Array<{ name: string; suite: TestSuite }> = [];
   private currentSuite: TestSuite | null = null;
 
@@ -77,12 +79,12 @@ export class TestSuite {
     return this;
   }
 
-  test(name: string, fn: () => void): this {
+  test(name: string, fn: () => void | Promise<void>): this {
     this.tests.push({ name, fn });
     return this;
   }
 
-  it(name: string, fn: () => void): this {
+  it(name: string, fn: () => void | Promise<void>): this {
     return this.test(name, fn);
   }
 
@@ -91,7 +93,11 @@ export class TestSuite {
 
     for (const test of this.tests) {
       try {
-        test.fn();
+        const result = test.fn();
+        // Handle async tests
+        if (result instanceof Promise) {
+          await result;
+        }
         testResults.push({ name: test.name, passed: true });
       } catch (error) {
         testResults.push({
@@ -136,26 +142,16 @@ export class TestSuite {
 
 const globalSuite = new TestSuite();
 
+(globalThis as any).globalSuite = globalSuite;
+
 export function describe(name: string, cb: () => void): void {
   globalSuite.describe(name, cb);
 }
 
-export function test(name: string, fn: () => void): void {
+export function test(name: string, fn: () => void | Promise<void>): void {
   globalSuite.test(name, fn);
 }
 
-export function it(name: string, fn: () => void): void {
+export function it(name: string, fn: () => void | Promise<void>): void {
   globalSuite.it(name, fn);
-}
-
-export async function run(): Promise<SuiteResult> {
-  return globalSuite.run();
-}
-
-export function printResults(result?: SuiteResult, indent?: string): void {
-  if (result) {
-    globalSuite.printResults(result, indent);
-  } else {
-    globalSuite.run().then((results) => globalSuite.printResults(results));
-  }
 }
