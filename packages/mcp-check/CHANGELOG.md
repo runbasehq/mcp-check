@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.1.4
+
+### Patch Changes
+
+- fix: agents import
+
 ## 0.1.3
 
 ### Patch Changes
