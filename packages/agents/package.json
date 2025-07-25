@@ -1,15 +1,24 @@
 {
   "name": "@mcp-check/agents",
   "private": true,
+  "type": "module", 
+  "main": "dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
   },
   "scripts": {
+    "build": "tsup",
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",
     "openai": "^5.10.1"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

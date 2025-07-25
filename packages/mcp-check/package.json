@@ -15,7 +15,10 @@
     "@anthropic-ai/sdk": "^0.56.0",
     "@modelcontextprotocol/sdk": "^1.16.0",
     "bun-plugin-dts": "^0.3.0",
+    "dotenv": "^16.4.7",
+    "glob": "^11.0.0",
     "openai": "^5.10.1",
+    "tsx": "^4.19.2",
     "zod": "^3.24.4"
   },
   "description": "",
@@ -26,12 +29,17 @@
       "require": "./dist/index.cjs"
     }
   },
+  "bin": {
+    "mcp-check": "./bin/mcp-check.cjs"
+  },
   "scripts": {
     "build": "tsup",
     "prepublishOnly": "pnpm build"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin",
+    "src"
   ],
   "publishConfig": {
     "access": "public"
