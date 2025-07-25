@@ -7,5 +7,6 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  external: ["@anthropic-ai/sdk", "@modelcontextprotocol/sdk"],
+  bundle: true,
+  external: ["@anthropic-ai/sdk", "@modelcontextprotocol/sdk", "openai"],
 });
