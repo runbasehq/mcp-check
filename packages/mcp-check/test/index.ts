@@ -1,11 +1,5 @@
 import { client, McpServer } from "@mcp-check/agents";
-import {
-  expect,
-  describe,
-  test,
-  run,
-  printResults,
-} from "../src/index.js";
+import { expect, describe, test, run, printResults } from "../src/index.js";
 
 const mcpServer = new McpServer({
   url: "https://mcp.deepwiki.com/mcp",
