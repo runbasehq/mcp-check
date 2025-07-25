@@ -1,5 +1,6 @@
 {
   "name": "@mcp-check/agents",
+  "private": true,
   "exports": {
     ".": "./src/index.ts"
   },
