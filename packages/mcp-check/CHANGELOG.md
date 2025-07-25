@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.1.1
+
+### Patch Changes
+
+- implement multiple agents testing
+
 ## 1.0.0
 
 ### Major Changes
