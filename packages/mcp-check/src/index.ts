@@ -1,8 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { Agents, McpServer } from "@mcp-check/agents"
-
 interface TestResult {
   name: string;
   passed: boolean;
@@ -16,7 +11,7 @@ interface SuiteResult {
 }
 
 export class Expectation {
-  constructor(private actual: any) { }
+  constructor(private actual: any) {}
 
   toBe(expected: any): void {
     if (this.actual !== expected) {
@@ -60,7 +55,6 @@ export class Expectation {
     console.log(`✓ Tool '${tool}' was called ${times} times as expected`);
   }
 }
-
 
 export function expect(actual: any): Expectation {
   return new Expectation(actual);
