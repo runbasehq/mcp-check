@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.1.2
+
+### Patch Changes
+
+- add mcp-check CLI
+
 ## 0.1.1
 
 ### Patch Changes
