@@ -2,8 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import type { ChatModel } from "openai/resources";
 
-const anthropic = new Anthropic();
-const openai = new OpenAI();
+// Only initialize clients if API keys are available
+const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
+const openai = process.env.OPENAI_API_KEY ? new OpenAI() : null;
 
 export type AnthropicModel = Anthropic.Model;
 export type OpenAIModel = ChatModel;
@@ -25,6 +26,11 @@ export class McpServer {
     authorizationToken,
     name,
     type,
+  }: {
+    url: string;
+    authorizationToken: string;
+    name: string;
+    type: string;
   }) {
     this.url = url;
     this.authorizationToken = authorizationToken;
@@ -32,7 +38,6 @@ export class McpServer {
     this.type = type;
   }
 }
-
 
 export class Agents {
   private promptText: string = "";
@@ -57,14 +62,13 @@ export class Agents {
     return this;
   }
 
-
   async execute(): Promise<this> {
     if (!this.mcpServer) {
-      throw new Error('MCP server not set');
+      throw new Error("MCP server not set");
     }
 
-    this.executionPromises = this.models.map(async model => {
-      if (model.startsWith('claude') || model.startsWith('claude-')) {
+    this.executionPromises = this.models.map(async (model) => {
+      if (model.startsWith("claude") || model.startsWith("claude-")) {
         return this.executeAnthropic(model as AnthropicModel);
       } else {
         return this.executeOpenAi(model as OpenAIModel);
@@ -80,7 +84,13 @@ export class Agents {
 
   private async executeAnthropic(model: AnthropicModel): Promise<this> {
     if (!this.mcpServer) {
-      throw new Error('MCP server not set');
+      throw new Error("MCP server not set");
+    }
+
+    if (!anthropic) {
+      throw new Error(
+        "Anthropic client not initialized. Please set ANTHROPIC_API_KEY environment variable.",
+      );
     }
 
     const stream = anthropic.beta.messages.stream({
@@ -107,10 +117,16 @@ export class Agents {
     const usedTools: string[] = [];
 
     for await (const chunk of stream) {
-      if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+      if (
+        chunk.type === "content_block_delta" &&
+        chunk.delta.type === "text_delta"
+      ) {
         content += chunk.delta.text;
         process.stdout.write(chunk.delta.text);
-      } else if (chunk.type === "content_block_start" && chunk.content_block.type === "mcp_tool_use") {
+      } else if (
+        chunk.type === "content_block_start" &&
+        chunk.content_block.type === "mcp_tool_use"
+      ) {
         usedTools.push(chunk.content_block.name);
       }
     }
@@ -123,7 +139,13 @@ export class Agents {
 
   private async executeOpenAi(model: OpenAIModel): Promise<this> {
     if (!this.mcpServer) {
-      throw new Error('MCP server not set');
+      throw new Error("MCP server not set");
+    }
+
+    if (!openai) {
+      throw new Error(
+        "OpenAI client not initialized. Please set OPENAI_API_KEY environment variable.",
+      );
     }
 
     const response = await openai.responses.create({
@@ -135,9 +157,9 @@ export class Agents {
           server_label: this.mcpServer.name,
           server_url: this.mcpServer.url,
           headers: {
-            "Authorization": `Bearer ${this.mcpServer.authorizationToken}`
-          }
-        }
+            Authorization: `${this.mcpServer.authorizationToken}`,
+          },
+        },
       ],
       input: this.promptText,
       stream: true,
@@ -146,9 +168,9 @@ export class Agents {
     const usedTools: string[] = [];
 
     for await (const chunk of response) {
-      if (chunk.type === 'response.output_item.added') {
+      if (chunk.type === "response.output_item.added") {
         const item = chunk.item;
-        if (item.type === 'mcp_call') {
+        if (item.type === "mcp_call") {
           usedTools.push(item.name);
         }
       }
@@ -159,4 +181,3 @@ export class Agents {
     return this;
   }
 }
-

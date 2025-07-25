@@ -1,5 +1,4 @@
-import { client, McpServer } from "@mcp-check/agents";
-import { expect, describe, test, run, printResults } from "../src/index.js";
+import { client, McpServer, expect, describe, test } from "../../src/index.js";
 
 const mcpServer = new McpServer({
   url: "https://mcp.deepwiki.com/mcp",
@@ -26,16 +25,3 @@ describe("update block tool", function () {
     expect(agent).toBeCalledTimes("update_blocks", 1);
   });
 });
-
-async function runTests() {
-  console.log("Starting test run...");
-  try {
-    const results = await run();
-    console.log("Tests completed, printing results...");
-    printResults(results);
-  } catch (error) {
-    console.error("Error running tests:", error);
-  }
-}
-
-runTests().catch(console.error);
