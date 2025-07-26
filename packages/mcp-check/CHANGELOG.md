@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.1.5
+
+### Patch Changes
+
+- fix mcp authentication
+
 ## 0.1.4
 
 ### Patch Changes
