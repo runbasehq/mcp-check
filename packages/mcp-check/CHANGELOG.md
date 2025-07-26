@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.2.1
+
+### Patch Changes
+
+- fix: remove bearer from authentication
+
 ## 0.2.0
 
 ### Minor Changes
