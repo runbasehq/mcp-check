@@ -1,16 +1,10 @@
 # mcp-testing-library
 
-## 0.1.5
-
-### Patch Changes
-
-- include agents in the bundle output
-
 ## 0.1.4
 
 ### Patch Changes
 
-- fix: agents import
+- 358693a: fix: include agents in the bundle output
 
 ## 0.1.3
 
