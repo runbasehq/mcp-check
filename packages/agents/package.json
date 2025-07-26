@@ -1,7 +1,7 @@
 {
   "name": "@mcp-check/agents",
   "version": "0.1.0",
-  "type": "module", 
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -28,6 +28,6 @@
     "dist"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "restricted"
   }
 }
