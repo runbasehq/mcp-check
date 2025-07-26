@@ -9,4 +9,5 @@ export default defineConfig({
   clean: true,
   bundle: true,
   external: ["@anthropic-ai/sdk", "@modelcontextprotocol/sdk", "openai"],
+  noExternal: ["@mcp-check/agents"],
 });

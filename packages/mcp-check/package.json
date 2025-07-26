@@ -12,6 +12,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@mcp-check/agents": "workspace:*",
     "@anthropic-ai/sdk": "^0.56.0",
     "@modelcontextprotocol/sdk": "^1.16.0",
     "bun-plugin-dts": "^0.3.0",
