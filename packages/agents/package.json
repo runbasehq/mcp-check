@@ -1,7 +1,9 @@
 {
-  "name": "@mcp-check/agents",
-  "private": true,
-  "version": "0.1.0",
+  "name": "mcp-check-agents",
+  "private": false,
+  "version": "0.1.1",
+  "description": "Multi-provider AI agent framework for Model Context Protocol (MCP) servers",
+  "keywords": ["mcp", "ai", "agents", "anthropic", "openai", "model-context-protocol"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -26,6 +28,19 @@
     "typescript": "^5.0.0"
   },
   "files": [
-    "dist"
-  ]
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/mcp-check.git",
+    "directory": "packages/agents"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

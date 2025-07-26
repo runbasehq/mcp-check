@@ -1,8 +1,8 @@
 import { client, McpServer, expect, describe, test } from "../../src/index.js";
 
 const mcpServer = new McpServer({
-  url: "https://mcp.deepwiki.com/mcp",
-  authorizationToken: process.env.BASEHUB_TOKEN!,
+  url: "https://basehub.com/api/mcp",
+  authorizationToken: `Bearer ${process.env.BASEHUB_TOKEN!}`,
   name: "basehub-marketing-website",
   type: "url",
 });
