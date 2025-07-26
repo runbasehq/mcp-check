@@ -4,6 +4,7 @@ import { config } from "dotenv";
 import { glob } from "glob";
 import { pathToFileURL } from "url";
 import * as path from "path";
+import { formatDuration, showHelp } from "./utils";
 
 config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -36,24 +37,6 @@ function parseArgs(): CliOptions {
   return options;
 }
 
-function showHelp(): void {
-  console.log(`
-Usage: mcp-check [options]
-
-Options:
-  --pattern, -p <pattern>  Test file pattern (default: "**/*.{test,spec}.?(c|m)[jt]s?(x)")
-  --help, -h               Show this help message
-
-Environment Variables:
-  OPENAI_API_KEY="sk-...YOUR-OPENAI-KEY..." or
-  ANTHROPIC_API_KEY="anth-...YOUR-ANTHROPIC-KEY..."
-
-Example:
-  mcp-check
-  mcp-check --pattern "tests/**/*.test.ts"
-`);
-}
-
 async function discoverTestFiles(pattern: string): Promise<string[]> {
   try {
     const files = await glob(pattern, {
@@ -68,7 +51,7 @@ async function discoverTestFiles(pattern: string): Promise<string[]> {
   }
 }
 
-async function runTestFile(filePath: string): Promise<void> {
+async function importTestFile(filePath: string): Promise<void> {
   try {
     console.log(
       `\n📄 Running tests from: ${path.relative(process.cwd(), filePath)}`,
@@ -84,6 +67,8 @@ async function runTestFile(filePath: string): Promise<void> {
 }
 
 async function runTests(pattern: string): Promise<void> {
+  const totalStartTime = Date.now();
+
   console.log("🔍 Discovering test files...");
   const testFiles = await discoverTestFiles(pattern);
 
@@ -94,26 +79,34 @@ async function runTests(pattern: string): Promise<void> {
 
   console.log(`✅ Found ${testFiles.length} test file(s)`);
 
-  const { describe, test, expect } = await import("./index.js");
-
   for (const testFile of testFiles) {
-    await runTestFile(testFile);
+    await importTestFile(testFile);
   }
 
   const globalSuite = (globalThis as any).globalSuite;
-  if (globalSuite) {
+  if (globalSuite && globalSuite.suites.length > 0) {
     console.log("\n🧪 Running tests...\n");
+    const testStartTime = Date.now();
     const results = await globalSuite.run();
+    const testDuration = Date.now() - testStartTime;
+
     globalSuite.printResults(results);
 
     const hasFailures = checkForFailures(results);
+    const totalDuration = Date.now() - totalStartTime;
+
+    console.log(`\n⏱️  Test execution time: ${formatDuration(testDuration)}`);
+    console.log(`⏱️  Total execution time: ${formatDuration(totalDuration)}`);
+
     if (hasFailures) {
       process.exit(1);
     } else {
       console.log("\n✅ All tests passed!");
     }
   } else {
+    const totalDuration = Date.now() - totalStartTime;
     console.log("❌ No tests were registered");
+    console.log(`⏱️  Total execution time: ${formatDuration(totalDuration)}`);
     process.exit(1);
   }
 }

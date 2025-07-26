@@ -4,6 +4,9 @@
     "paths": {
       "@mcp-check/agents": [
         "packages/agents"
+      ],
+      "mcp-check": [
+        "packages/mcp-check"
       ]
     }
   }

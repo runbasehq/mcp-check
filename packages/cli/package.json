@@ -1,0 +1,31 @@
+{
+    "name": "@mcp-check/cli",
+    "type": "module",
+    "private": true,
+    "version": "0.1.0",
+    "scripts": {
+        "build": "tsup",
+        "lint": "eslint . --max-warnings 0",
+        "check-types": "tsc --noEmit",
+        "prepublishOnly": "pnpm build"
+    },
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs"
+        }
+    },
+    "dependencies": {
+        "mcp-check": "workspace:*",
+        "glob": "^11.0.0",
+        "dotenv": "^16.4.7"
+    },
+    "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "@repo/eslint-config": "workspace:*",
+        "typescript": "latest"
+    }
+}

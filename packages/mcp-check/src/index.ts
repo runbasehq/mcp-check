@@ -4,6 +4,7 @@ interface TestResult {
   name: string;
   passed: boolean;
   error?: Error;
+  duration?: number;
 }
 
 interface SuiteResult {
@@ -92,18 +93,22 @@ class TestSuite {
     const testResults: TestResult[] = [];
 
     for (const test of this.tests) {
+      const startTime = Date.now();
       try {
         const result = test.fn();
         // Handle async tests
         if (result instanceof Promise) {
           await result;
         }
-        testResults.push({ name: test.name, passed: true });
+        const duration = Date.now() - startTime;
+        testResults.push({ name: test.name, passed: true, duration });
       } catch (error) {
+        const duration = Date.now() - startTime;
         testResults.push({
           name: test.name,
           passed: false,
           error: error instanceof Error ? error : new Error(String(error)),
+          duration,
         });
       }
     }
@@ -128,7 +133,8 @@ class TestSuite {
 
     for (const test of result.tests) {
       const status = test.passed ? "✓" : "✗";
-      console.log(`${indent}${status} ${test.name}`);
+      const duration = test.duration ? ` (${this.formatDuration(test.duration)})` : "";
+      console.log(`${indent}${status} ${test.name}${duration}`);
       if (!test.passed && test.error) {
         console.log(`${indent}  Error: ${test.error.message}`);
       }
@@ -136,6 +142,18 @@ class TestSuite {
 
     for (const suite of result.suites) {
       this.printResults(suite, indent);
+    }
+  }
+
+  private formatDuration(ms: number): string {
+    if (ms < 1000) {
+      return `${ms}ms`;
+    } else if (ms < 60000) {
+      return `${(ms / 1000).toFixed(2)}s`;
+    } else {
+      const minutes = Math.floor(ms / 60000);
+      const seconds = ((ms % 60000) / 1000).toFixed(2);
+      return `${minutes}m ${seconds}s`;
     }
   }
 }
