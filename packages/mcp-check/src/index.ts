@@ -1,4 +1,4 @@
-export { client, McpServer } from "../../agents/src/index.js";
+export { client, McpServer } from "@mcp-check/agents";
 
 interface TestResult {
   name: string;
