@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.2.2
+
+### Patch Changes
+
+- Implement client() and McpServer classes for prompt execution
+
 ## 0.2.1
 
 ### Patch Changes
