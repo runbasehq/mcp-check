@@ -1,8 +1,14 @@
 import type { McpServer } from "../index.js";
 
+export interface ToolCall {
+  args: Record<string, any>;
+  result?: any;
+}
+
 export interface StreamResult {
   usedTools: string[];
   content: string;
+  toolCalls: Record<string, ToolCall[]>;
 }
 
 export abstract class Provider {
