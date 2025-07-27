@@ -43,6 +43,7 @@ export class AnthropicProvider extends Provider {
 
     let content = "";
     const usedTools: string[] = [];
+    const toolCalls: Record<string, any[]> = {};
 
     for await (const chunk of stream) {
       if (
@@ -55,11 +56,43 @@ export class AnthropicProvider extends Provider {
         chunk.type === "content_block_start" &&
         chunk.content_block.type === "mcp_tool_use"
       ) {
-        usedTools.push(chunk.content_block.name);
+        const toolName = chunk.content_block.name;
+        usedTools.push(toolName);
+        
+        if (!toolCalls[toolName]) {
+          toolCalls[toolName] = [];
+        }
+        
+        toolCalls[toolName].push({
+          args: chunk.content_block.input || {},
+          result: null
+        });
+      } else if (chunk.type === "content_block_stop") {
+        // Tool execution finished - we'll get the result from finalMessage
       }
     }
 
-    await stream.finalMessage();
-    return { usedTools, content };
+    const finalMessage = await stream.finalMessage();
+    
+    // Update tool call results from the final message
+    if (finalMessage.content) {
+      for (const block of finalMessage.content) {
+        if (block.type === "mcp_tool_result") {
+          // Find the tool call by matching with the order of tool executions
+          const toolNames = Object.keys(toolCalls);
+          for (const toolName of toolNames) {
+            if (toolCalls[toolName] && toolCalls[toolName].length > 0) {
+              const lastCall = toolCalls[toolName][toolCalls[toolName].length - 1];
+              if (lastCall && lastCall.result === null) {
+                lastCall.result = block.content;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return { usedTools, content, toolCalls };
   }
 }

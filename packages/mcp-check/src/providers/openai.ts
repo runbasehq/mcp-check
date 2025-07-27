@@ -40,17 +40,40 @@ export class OpenAIProvider extends Provider {
     });
 
     const usedTools: string[] = [];
+    const toolCalls: Record<string, any[]> = {};
     let content = "";
 
     for await (const chunk of response) {
       if (chunk.type === "response.output_item.added") {
         const item = chunk.item;
         if (item.type === "mcp_call") {
-          usedTools.push(item.name);
+          const toolName = item.name;
+          usedTools.push(toolName);
+          
+          if (!toolCalls[toolName]) {
+            toolCalls[toolName] = [];
+          }
+          
+          toolCalls[toolName].push({
+            args: item.arguments || {},
+            result: null
+          });
+        }
+      } else if (chunk.type === "response.output_item.done") {
+        const item = chunk.item;
+        if (item.type === "mcp_call") {
+          // Update the most recent tool call result
+          const toolName = item.name;
+          if (toolCalls[toolName] && toolCalls[toolName].length > 0) {
+            const lastCall = toolCalls[toolName][toolCalls[toolName].length - 1];
+            if (lastCall) {
+              lastCall.result = { id: `result_${Date.now()}`, status: "completed" };
+            }
+          }
         }
       }
     }
 
-    return { usedTools, content };
+    return { usedTools, content, toolCalls };
   }
 }
