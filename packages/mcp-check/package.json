@@ -35,11 +35,13 @@
     }
   },
   "bin": {
-    "mcp-check": "./bin/mcp-check.cjs"
+    "mcp-check": "./bin/mcp-check"
   },
   "scripts": {
     "build": "tsup",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "test": "./bin/mcp-test",
+    "test:jest": "jest"
   },
   "files": [
     "dist",
@@ -48,5 +50,10 @@
   ],
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/runbasehq/mcp-check.git"
+  },
+  "homepage": "https://github.com/runbasehq/mcp-check#readme"
 }

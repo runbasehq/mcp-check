@@ -2,12 +2,10 @@
   "compilerOptions": {
     "baseUrl": ".",
     // Enable latest features
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
+    "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "module": "ESNext",
+    "esModuleInterop": true,
     "moduleDetection": "force",
     "jsx": "react-jsx",
     "allowJs": true,
@@ -25,9 +23,7 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
     "paths": {
-      "@mcp-check/agents": [
-        "../agents/"
-      ]
+      "@mcp-check/agents": ["../agents/"]
     }
   }
 }
