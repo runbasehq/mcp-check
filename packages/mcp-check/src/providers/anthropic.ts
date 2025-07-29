@@ -51,7 +51,7 @@ export class AnthropicProvider extends Provider {
         chunk.delta.type === "text_delta"
       ) {
         content += chunk.delta.text;
-        process.stdout.write(JSON.stringify(chunk.delta.text));
+        process.stdout.write(JSON.stringify({ type: "model_stream", model: model, text: chunk.delta.text }));
       } else if (
         chunk.type === "content_block_start" &&
         chunk.content_block.type === "mcp_tool_use"

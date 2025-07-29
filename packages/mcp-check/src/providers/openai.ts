@@ -43,12 +43,26 @@ export class OpenAIProvider extends Provider {
     const toolCalls: Record<string, any[]> = {};
     let content = "";
 
+    // Log stream start
+    process.stdout.write(JSON.stringify({ 
+      type: "model_stream", 
+      model: model, 
+      text: `Starting ${model} execution...` 
+    }));
+
     for await (const chunk of response) {
       if (chunk.type === "response.output_item.added") {
         const item = chunk.item;
         if (item.type === "mcp_call") {
           const toolName = item.name;
           usedTools.push(toolName);
+          
+          // Log tool call start
+          process.stdout.write(JSON.stringify({ 
+            type: "model_stream", 
+            model: model, 
+            text: `Tool call: ${toolName}` 
+          }));
           
           if (!toolCalls[toolName]) {
             toolCalls[toolName] = [];
@@ -68,11 +82,25 @@ export class OpenAIProvider extends Provider {
             const lastCall = toolCalls[toolName][toolCalls[toolName].length - 1];
             if (lastCall) {
               lastCall.result = { id: `result_${Date.now()}`, status: "completed" };
+              
+              // Log tool call completion
+              process.stdout.write(JSON.stringify({ 
+                type: "model_stream", 
+                model: model, 
+                text: `Tool ${toolName} completed` 
+              }));
             }
           }
         }
       }
     }
+
+    // Log stream completion
+    process.stdout.write(JSON.stringify({ 
+      type: "model_stream", 
+      model: model, 
+      text: `${model} execution completed` 
+    }));
 
     return { usedTools, content, toolCalls };
   }
