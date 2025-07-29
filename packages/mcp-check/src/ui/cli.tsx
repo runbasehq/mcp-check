@@ -233,7 +233,6 @@ const TaskManager = () => {
   });
   const [animationFrame, setAnimationFrame] = useState(0);
 
-  // Animation for spinners
   useEffect(() => {
     const timer = setInterval(() => {
       setAnimationFrame((f) => f + 1);
@@ -384,23 +383,18 @@ const TaskManager = () => {
     );
   }
 
-  // Build right column lines
   const rightLines: string[] = [];
 
-  // Header
   rightLines.push(
     `${tasks[selectedTask]?.name || "No task"} - ${taskStatus[tasks[selectedTask]?.name] || "Loading..."}`,
   );
 
-  // Log info
   rightLines.push(
     `Logs: ${taskLogs[tasks[selectedTask]?.name]?.length || 0} entries | Press Enter to view details`,
   );
 
-  // Empty line
   rightLines.push("");
 
-  // Recent logs
   if (tasks[selectedTask] && taskLogs[tasks[selectedTask].name]?.length > 0) {
     rightLines.push("Recent logs:");
     rightLines.push("");
@@ -417,7 +411,6 @@ const TaskManager = () => {
     });
   }
 
-  // Running indicator
   if (
     tasks[selectedTask] &&
     taskStatus[tasks[selectedTask].name] === "running"
@@ -426,16 +419,13 @@ const TaskManager = () => {
     rightLines.push("");
   }
 
-  // Ensure we have at least TERMINAL_HEIGHT - 2 lines
   while (rightLines.length < TERMINAL_HEIGHT - 2) {
     rightLines.push("");
   }
 
-  // Add controls at the end
   rightLines.push("↑ ↓ - Select | Enter - Details | q - Quit");
   rightLines.push("Auto-running tests and models");
 
-  // Render line by line
   return (
     <Box flexDirection="column" height={TERMINAL_HEIGHT}>
       {/* Header */}
@@ -447,9 +437,7 @@ const TaskManager = () => {
         <Text color="gray">{rightLines[0]}</Text>
       </Box>
 
-      {/* Content lines */}
       {Array.from({ length: TERMINAL_HEIGHT - 1 }).map((_, lineIndex) => {
-        // Left column content
         let leftContent = "";
         let leftColor = "white";
         let leftBg = undefined;
@@ -460,7 +448,6 @@ const TaskManager = () => {
           const isSelected = lineIndex === selectedTask;
           const indicator = getStatusIndicator(status, animationFrame);
 
-          // Build the complete string with indicator
           const fullText = `${indicator} ${task.name}`;
 
           if (isSelected) {
@@ -474,7 +461,6 @@ const TaskManager = () => {
           leftContent = padToWidth("", LEFT_COLUMN_WIDTH);
         }
 
-        // Get status color for the indicator
         let statusColor = "white";
         if (lineIndex < tasks.length) {
           const status = taskStatus[tasks[lineIndex].name] || "running";
