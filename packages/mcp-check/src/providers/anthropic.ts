@@ -1,23 +1,22 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { Provider, type StreamResult } from "./provider.js";
+import { Provider } from "./provider.js";
+import type { StreamResult, ProviderConfig } from "./types.js";
 import type { McpServer } from "../index.js";
+
+export type AnthropicModel = Anthropic.Model;
 
 export class AnthropicProvider extends Provider {
   private client: Anthropic | null;
-
-  constructor(mcpServer: McpServer, promptText: string) {
-    super(mcpServer, promptText);
-    this.client = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
-  }
-
-  isValidModel(model: string): boolean {
-    return model.startsWith("claude") || model.startsWith("claude-");
+  constructor(mcpServer: McpServer, promptText: string, config: ProviderConfig = {}) {
+    super(mcpServer, promptText, config);
+    const apiKey = config.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+    this.client = apiKey ? new Anthropic({ apiKey }) : null;
   }
 
   async stream(model: string): Promise<StreamResult> {
     if (!this.client) {
       throw new Error(
-        "Anthropic client not initialized. Please set ANTHROPIC_API_KEY environment variable.",
+        "Anthropic client not initialized. Please set ANTHROPIC_API_KEY environment variable or pass anthropicApiKey in config."
       );
     }
 
