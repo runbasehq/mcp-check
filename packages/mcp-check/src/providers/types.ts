@@ -1,16 +1,8 @@
-export interface ToolCall {
-  args: Record<string, any>;
-  result?: any;
-}
-
-export interface StreamResult {
-  usedTools: string[];
-  content: string;
-  toolCalls: Record<string, ToolCall[]>;
-}
+import type { ChunkHandlerConfig } from "../chunks/types.js";
 
 export interface ProviderConfig {
   anthropicApiKey?: string;
   openaiApiKey?: string;
+  chunkHandlers?: ChunkHandlerConfig;
   [key: string]: any;
-} 
+}
