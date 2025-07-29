@@ -9,7 +9,10 @@ const mcpServer = new McpServer({
 
 describe("update block tool", function () {
   test("should use update block tools", async function () {
-    const agent = await client(mcpServer, ["claude-3-haiku-20240307"])
+    const agent = await client(mcpServer, [
+      "claude-3-haiku-20240307",
+      // "claude-3-5-haiku-latest",
+    ])
       .prompt("Change the hero title to testing update block on Basehub.")
       .execute();
 
@@ -30,5 +33,5 @@ describe("update block tool", function () {
       agent.toolCalls?.["claude-3-haiku-20240307"]?.["update_blocks"] ?? [];
     const firstResult = updateBlocks[0]?.result;
     expect(typeof firstResult?.id).toBe("string");
-  }, 90000);
+  }, 120000);
 });

@@ -1,9 +1,7 @@
-#!/usr/bin/env node
 import React, { useState, useEffect } from "react";
 import { render, Box, Text, useInput } from "ink";
 import { spawn } from "child_process";
 import { glob } from "glob";
-import { readFileSync } from "fs";
 import path from "path";
 import stringWidth from "string-width";
 
@@ -37,26 +35,14 @@ const getJestTests = async (): Promise<string[]> => {
   }
 };
 
-const getRunningModels = (): string[] => {
-  try {
-    const testFile = path.join(process.cwd(), "tests/index.test.ts");
-    const content = readFileSync(testFile, "utf-8");
-    const modelMatch = content.match(/\["([^"]+)"\]/);
-    if (modelMatch) {
-      return [modelMatch[1]];
-    }
-  } catch {
-    // fallback
-  }
-  return ["claude-3-haiku-20240307"];
-};
-
 const runJestCommand = (
+  jestTasks: string[],
   onLogUpdate: (taskName: string, logs: LogEntry[]) => void,
   onStatusUpdate: (
     taskName: string,
     status: "running" | "completed" | "failed",
   ) => void,
+  onModelDiscovered: (modelName: string) => void,
 ): Promise<void> => {
   return new Promise((resolve) => {
     const jestLogs: LogEntry[] = [];
@@ -65,7 +51,9 @@ const runJestCommand = (
 
     const addJestLog = (entry: LogEntry) => {
       jestLogs.push(entry);
-      onLogUpdate("jest:index", [...jestLogs]);
+      jestTasks.forEach((taskName) => {
+        onLogUpdate(taskName, [...jestLogs]);
+      });
     };
 
     const addModelLog = (modelName: string, entry: LogEntry) => {
@@ -90,7 +78,16 @@ const runJestCommand = (
 
     const child = spawn(
       "npx",
-      ["jest", "--colors", "--verbose", "--no-coverage"],
+      [
+        "jest",
+        "--colors",
+        "--verbose",
+        "--no-coverage",
+        "--passWithNoTests",
+        "--forceExit",
+        "--bail=false",
+        "--detectOpenHandles",
+      ],
       {
         stdio: "pipe",
         env: { ...process.env, FORCE_COLOR: "1" },
@@ -104,8 +101,6 @@ const runJestCommand = (
       message: "Starting Jest tests...",
     });
 
-    let jestBuffer = "";
-
     child.stdout.on("data", (data) => {
       const chunk = data.toString();
       const lines = chunk.split("\n");
@@ -115,7 +110,10 @@ const runJestCommand = (
         try {
           const streamData = JSON.parse(line.trim());
           if (streamData?.type === "model_stream" && streamData.text) {
-            const modelName = streamData.model || "claude-3-haiku-20240307";
+            const modelName = streamData?.model ?? "";
+            if (modelName && !modelLogs[modelName]) {
+              onModelDiscovered(modelName);
+            }
             modelBuffers[modelName] =
               (modelBuffers[modelName] || "") + streamData.text;
             const buf = modelBuffers[modelName];
@@ -124,9 +122,7 @@ const runJestCommand = (
             }
             return;
           }
-        } catch {
-          // not JSON → jest output
-        }
+        } catch {}
 
         if (!line.includes('"type":"model_stream"')) {
           cleanJestOutput += line + "\n";
@@ -134,16 +130,17 @@ const runJestCommand = (
       });
 
       if (cleanJestOutput.trim()) {
-        jestBuffer += cleanJestOutput;
-        if (jestBuffer.length > 200 || jestBuffer.includes("\n\n")) {
+        const outputLines = cleanJestOutput
+          .split("\n")
+          .filter((line) => line.trim());
+        outputLines.forEach((line) => {
           addJestLog({
             timestamp: new Date().toISOString(),
             thread: "",
             service: "jest",
-            message: jestBuffer.trim(),
+            message: line.trim(),
           });
-          jestBuffer = "";
-        }
+        });
       }
     });
 
@@ -160,14 +157,6 @@ const runJestCommand = (
     });
 
     child.on("close", (code) => {
-      if (jestBuffer.trim()) {
-        addJestLog({
-          timestamp: new Date().toISOString(),
-          thread: "",
-          service: "jest",
-          message: jestBuffer.trim(),
-        });
-      }
       Object.keys(modelBuffers).forEach(flushModelBuffer);
 
       addJestLog({
@@ -178,7 +167,9 @@ const runJestCommand = (
       });
 
       const status = code === 0 ? "completed" : "failed";
-      onStatusUpdate("jest:index", status);
+      jestTasks.forEach((taskName) => {
+        onStatusUpdate(taskName, status);
+      });
       Object.keys(modelLogs).forEach((model) =>
         onStatusUpdate(model, "completed"),
       );
@@ -192,18 +183,18 @@ const runJestCommand = (
         service: "jest",
         message: `Jest error: ${error.message}`,
       });
-      onStatusUpdate("jest:index", "completed");
+      jestTasks.forEach((taskName) => {
+        onStatusUpdate(taskName, "completed");
+      });
       resolve();
     });
   });
 };
 
-// Improved padToWidth function using string-width
 const padToWidth = (str: string, width: number): string => {
   const currentWidth = stringWidth(str);
 
   if (currentWidth >= width) {
-    // Truncate if needed
     let result = "";
     for (const char of str) {
       if (stringWidth(result + char) > width) break;
@@ -265,29 +256,55 @@ const TaskManager = () => {
 
   useEffect(() => {
     const loadAndExecute = async () => {
-      const jestTests = await getJestTests();
-      const models = getRunningModels();
+      try {
+        const jestTests = await getJestTests();
+        const models: string[] = [];
 
-      const allTasks: Task[] = [
-        ...jestTests.map((name) => ({
-          name,
-          selected: false,
-          type: "jest" as const,
-        })),
-        ...models.map((name) => ({
-          name,
-          selected: false,
-          type: "model" as const,
-        })),
-      ];
-      if (allTasks.length) {
-        allTasks[0].selected = true;
+        const allTasks: Task[] = [
+          ...jestTests.map((name) => ({
+            name,
+            selected: false,
+            type: "jest" as const,
+          })),
+          ...models.map((name) => ({
+            name,
+            selected: false,
+            type: "model" as const,
+          })),
+        ];
+        if (allTasks.length) {
+          allTasks[0].selected = true;
+        }
+        setTasks(allTasks);
+        setTaskStatus(
+          allTasks.reduce((acc, t) => ({ ...acc, [t.name]: "running" }), {}),
+        );
+        const handleModelDiscovered = (modelName: string) => {
+          setTasks((prevTasks) => {
+            if (prevTasks.some((t) => t.name === modelName)) return prevTasks;
+            const newTask = {
+              name: modelName,
+              selected: false,
+              type: "model" as const,
+            };
+            return [...prevTasks, newTask];
+          });
+          setTaskStatus((prevStatus) => ({
+            ...prevStatus,
+            [modelName]: "running",
+          }));
+        };
+
+        runJestCommand(
+          jestTests,
+          handleLogUpdate,
+          handleStatusUpdate,
+          handleModelDiscovered,
+        );
+      } catch (error) {
+        console.error("Failed to initialize:", error);
+        process.exit(1);
       }
-      setTasks(allTasks);
-      setTaskStatus(
-        allTasks.reduce((acc, t) => ({ ...acc, [t.name]: "running" }), {}),
-      );
-      runJestCommand(handleLogUpdate, handleStatusUpdate);
     };
     loadAndExecute();
   }, []);
@@ -471,7 +488,6 @@ const TaskManager = () => {
                 : "green";
         }
 
-        // Right column content
         const rightContent = rightLines[lineIndex + 1] || "";
 
         return (
