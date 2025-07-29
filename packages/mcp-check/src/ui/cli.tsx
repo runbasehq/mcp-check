@@ -206,13 +206,11 @@ const padToWidth = (str: string, width: number): string => {
   return str + " ".repeat(width - currentWidth);
 };
 
-// Get status indicator characters
 const getStatusIndicator = (
   status: "running" | "completed" | "failed",
   frame: number,
 ): string => {
   if (status === "running") {
-    // Simple rotating animation
     const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     return frames[frame % frames.length];
   }
