@@ -1,24 +1,24 @@
 import OpenAI from "openai";
 import type { ChatModel } from "openai/resources";
-import { Provider, type StreamResult } from "./provider.js";
+import { Provider } from "./provider.js";
+import type { StreamResult, ProviderConfig } from "./types.js";
 import type { McpServer } from "../index.js";
+
+export type OpenAIModel = ChatModel;
 
 export class OpenAIProvider extends Provider {
   private client: OpenAI | null;
 
-  constructor(mcpServer: McpServer, promptText: string) {
-    super(mcpServer, promptText);
-    this.client = process.env.OPENAI_API_KEY ? new OpenAI() : null;
-  }
-
-  isValidModel(model: string): boolean {
-    return !model.startsWith("claude") && !model.startsWith("claude-");
+  constructor(mcpServer: McpServer, promptText: string, config: ProviderConfig = {}) {
+    super(mcpServer, promptText, config);
+    const apiKey = config.openaiApiKey || process.env.OPENAI_API_KEY;
+    this.client = apiKey ? new OpenAI({ apiKey }) : null;
   }
 
   async stream(model: string): Promise<StreamResult> {
     if (!this.client) {
       throw new Error(
-        "OpenAI client not initialized. Please set OPENAI_API_KEY environment variable.",
+        "OpenAI client not initialized. Please set OPENAI_API_KEY environment variable or pass openaiApiKey in config."
       );
     }
 
