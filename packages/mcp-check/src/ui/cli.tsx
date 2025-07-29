@@ -5,6 +5,7 @@ import { spawn } from "child_process";
 import { glob } from "glob";
 import { readFileSync } from "fs";
 import path from "path";
+import stringWidth from "string-width";
 
 interface Task {
   name: string;
@@ -79,7 +80,7 @@ const runJestCommand = (
       if (modelBuffers[modelName]?.trim()) {
         addModelLog(modelName, {
           timestamp: new Date().toISOString(),
-          thread: "stream",
+          thread: "",
           service: modelName,
           message: modelBuffers[modelName].trim(),
         });
@@ -98,7 +99,7 @@ const runJestCommand = (
 
     addJestLog({
       timestamp: new Date().toISOString(),
-      thread: "init",
+      thread: "",
       service: "jest",
       message: "Starting Jest tests...",
     });
@@ -137,7 +138,7 @@ const runJestCommand = (
         if (jestBuffer.length > 200 || jestBuffer.includes("\n\n")) {
           addJestLog({
             timestamp: new Date().toISOString(),
-            thread: "jest",
+            thread: "",
             service: "jest",
             message: jestBuffer.trim(),
           });
@@ -151,7 +152,7 @@ const runJestCommand = (
       if (msg) {
         addJestLog({
           timestamp: new Date().toISOString(),
-          thread: "jest",
+          thread: "",
           service: "jest",
           message: msg,
         });
@@ -162,7 +163,7 @@ const runJestCommand = (
       if (jestBuffer.trim()) {
         addJestLog({
           timestamp: new Date().toISOString(),
-          thread: "jest",
+          thread: "",
           service: "jest",
           message: jestBuffer.trim(),
         });
@@ -171,7 +172,7 @@ const runJestCommand = (
 
       addJestLog({
         timestamp: new Date().toISOString(),
-        thread: "complete",
+        thread: "",
         service: "jest",
         message: `Jest tests completed with exit code: ${code}`,
       });
@@ -187,7 +188,7 @@ const runJestCommand = (
     child.on("error", (error) => {
       addJestLog({
         timestamp: new Date().toISOString(),
-        thread: "error",
+        thread: "",
         service: "jest",
         message: `Jest error: ${error.message}`,
       });
@@ -197,27 +198,37 @@ const runJestCommand = (
   });
 };
 
-// Función para asegurar que un string tenga exactamente el ancho especificado
+// Improved padToWidth function using string-width
 const padToWidth = (str: string, width: number): string => {
-  // Contar el ancho real considerando emojis (que ocupan 2 espacios)
-  const emojiRegex =
-    /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu;
-  const emojis = str.match(emojiRegex) || [];
-  const visualLength = str.length + emojis.length; // emojis cuentan doble
+  const currentWidth = stringWidth(str);
 
-  if (visualLength > width) {
-    // Cortar considerando el ancho visual
+  if (currentWidth >= width) {
+    // Truncate if needed
     let result = "";
-    let currentWidth = 0;
     for (const char of str) {
-      const charWidth = emojiRegex.test(char) ? 2 : 1;
-      if (currentWidth + charWidth > width) break;
+      if (stringWidth(result + char) > width) break;
       result += char;
-      currentWidth += charWidth;
     }
-    return result + " ".repeat(width - currentWidth);
+    return result + " ".repeat(Math.max(0, width - stringWidth(result)));
   }
-  return str + " ".repeat(width - visualLength);
+
+  return str + " ".repeat(width - currentWidth);
+};
+
+// Get status indicator characters
+const getStatusIndicator = (
+  status: "running" | "completed" | "failed",
+  frame: number,
+): string => {
+  if (status === "running") {
+    // Simple rotating animation
+    const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+    return frames[frame % frames.length];
+  }
+  if (status === "failed") {
+    return "✗";
+  }
+  return "✓";
 };
 
 const TaskManager = () => {
@@ -231,6 +242,15 @@ const TaskManager = () => {
     mode: "task-list",
     scrollPosition: 0,
   });
+  const [animationFrame, setAnimationFrame] = useState(0);
+
+  // Animation for spinners
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setAnimationFrame((f) => f + 1);
+    }, 80);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleLogUpdate = (taskName: string, logs: LogEntry[]) => {
     setTaskLogs((prev) => ({ ...prev, [taskName]: logs }));
@@ -321,7 +341,9 @@ const TaskManager = () => {
         <Box flexDirection="column" flexGrow={1}>
           {status === "running" && logs.length === 0 && (
             <Box marginTop={1}>
-              <Text color="yellow">Running...</Text>
+              <Text color="yellow">
+                {getStatusIndicator(status, animationFrame)} Running...
+              </Text>
             </Box>
           )}
           {logs
@@ -333,10 +355,9 @@ const TaskManager = () => {
                 </Text>
                 <Text color="white">
                   {" "}
-                  | {entry.timestamp.split("T")[1]?.split(".")[0]}{" "}
-                  {entry.thread}
+                  | {entry.timestamp.split("T")[1]?.split(".")[0]}
                 </Text>
-                <Text color="gray">{entry.message}</Text>
+                <Text color="gray"> {entry.message}</Text>
               </Box>
             ))}
         </Box>
@@ -348,7 +369,7 @@ const TaskManager = () => {
     );
   }
 
-  // Construir las líneas del lado derecho
+  // Build right column lines
   const rightLines: string[] = [];
 
   // Header
@@ -356,12 +377,12 @@ const TaskManager = () => {
     `${tasks[selectedTask]?.name || "No task"} - ${taskStatus[tasks[selectedTask]?.name] || "Loading..."}`,
   );
 
-  // Info de logs
+  // Log info
   rightLines.push(
     `Logs: ${taskLogs[tasks[selectedTask]?.name]?.length || 0} entries | Press Enter to view details`,
   );
 
-  // Línea vacía
+  // Empty line
   rightLines.push("");
 
   // Recent logs
@@ -390,16 +411,16 @@ const TaskManager = () => {
     rightLines.push("");
   }
 
-  // Asegurar que tengamos al menos TERMINAL_HEIGHT - 2 líneas (dejando espacio para los controles)
+  // Ensure we have at least TERMINAL_HEIGHT - 2 lines
   while (rightLines.length < TERMINAL_HEIGHT - 2) {
     rightLines.push("");
   }
 
-  // Agregar controles al final
+  // Add controls at the end
   rightLines.push("↑ ↓ - Select | Enter - Details | q - Quit");
   rightLines.push("Auto-running tests and models");
 
-  // Renderizar línea por línea
+  // Render line by line
   return (
     <Box flexDirection="column" height={TERMINAL_HEIGHT}>
       {/* Header */}
@@ -411,39 +432,62 @@ const TaskManager = () => {
         <Text color="gray">{rightLines[0]}</Text>
       </Box>
 
-      {/* Líneas de contenido */}
+      {/* Content lines */}
       {Array.from({ length: TERMINAL_HEIGHT - 1 }).map((_, lineIndex) => {
-        // Contenido de la columna izquierda
+        // Left column content
         let leftContent = "";
-        let leftColor = "gray";
+        let leftColor = "white";
         let leftBg = undefined;
 
         if (lineIndex < tasks.length) {
           const task = tasks[lineIndex];
           const status = taskStatus[task.name] || "running";
-          const icon =
-            status === "running" ? "⏳" : status === "failed" ? "❌" : "✅";
           const isSelected = lineIndex === selectedTask;
-          leftContent = `${icon} ${task.name}`;
+          const indicator = getStatusIndicator(status, animationFrame);
+
+          // Build the complete string with indicator
+          const fullText = `${indicator} ${task.name}`;
+
           if (isSelected) {
-            leftContent = padToWidth(leftContent, LEFT_COLUMN_WIDTH - 2) + " »";
+            leftContent = padToWidth(fullText, LEFT_COLUMN_WIDTH - 2) + " »";
             leftColor = "yellow";
             leftBg = "gray";
           } else {
-            leftContent = padToWidth(leftContent, LEFT_COLUMN_WIDTH);
+            leftContent = padToWidth(fullText, LEFT_COLUMN_WIDTH);
           }
         } else {
           leftContent = padToWidth("", LEFT_COLUMN_WIDTH);
         }
 
-        // Contenido de la columna derecha
+        // Get status color for the indicator
+        let statusColor = "white";
+        if (lineIndex < tasks.length) {
+          const status = taskStatus[tasks[lineIndex].name] || "running";
+          statusColor =
+            status === "running"
+              ? "yellow"
+              : status === "failed"
+                ? "red"
+                : "green";
+        }
+
+        // Right column content
         const rightContent = rightLines[lineIndex + 1] || "";
 
         return (
           <Box key={`line-${lineIndex}`}>
-            <Text color={leftColor} backgroundColor={leftBg}>
-              {leftContent}
-            </Text>
+            {lineIndex < tasks.length && leftContent.length > 0 ? (
+              <Box width={LEFT_COLUMN_WIDTH}>
+                <Text color={statusColor}>{leftContent.charAt(0)} </Text>
+                <Text color={leftColor} backgroundColor={leftBg}>
+                  {leftContent.substring(2)}
+                </Text>
+              </Box>
+            ) : (
+              <Text color={leftColor} backgroundColor={leftBg}>
+                {leftContent}
+              </Text>
+            )}
             <Text color="gray">│ </Text>
             <Text
               color={
