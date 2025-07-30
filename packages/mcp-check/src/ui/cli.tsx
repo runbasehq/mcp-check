@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { render, Box, Text, useInput, useStdout } from "ink";
 import { spawn } from "child_process";
 import { glob } from "glob";
@@ -11,7 +11,7 @@ interface Task {
   type: "jest" | "model";
   status: "running" | "completed" | "failed";
   logs: LogEntry[];
-  orderIndex: number; // Fixed order position
+  orderIndex: number;
 }
 
 interface LogEntry {
@@ -148,7 +148,6 @@ const runJestCommand = (
       },
     );
 
-    // Add initial log to jest tasks
     jestTasks.forEach((taskName) => {
       addLogToTask(taskName, {
         timestamp: new Date().toISOString(),
@@ -242,7 +241,6 @@ const runJestCommand = (
         });
       });
 
-      // Update all task statuses
       const status = code === 0 ? "completed" : "failed";
       tasks.forEach((task) => {
         if (task.type === "jest") {
@@ -375,7 +373,10 @@ const TaskManager = () => {
       const logs = currentTask?.logs || [];
       if (key.upArrow && uiState.scrollPosition > 0) {
         setUIState((s) => ({ ...s, scrollPosition: s.scrollPosition - 1 }));
-      } else if (key.downArrow && uiState.scrollPosition < logs.length - (terminalHeight - 6)) {
+      } else if (
+        key.downArrow &&
+        uiState.scrollPosition < logs.length - (terminalHeight - 6)
+      ) {
         setUIState((s) => ({ ...s, scrollPosition: s.scrollPosition + 1 }));
       } else if (key.escape || input === "q") {
         setUIState({ mode: "task-list", scrollPosition: 0 });
@@ -403,8 +404,9 @@ const TaskManager = () => {
         </Box>
         <Box>
           <Text color="gray">
-            Showing {Math.min(terminalHeight - 6, logs.length - uiState.scrollPosition)} of{" "}
-            {logs.length} logs | ESC to go back
+            Showing{" "}
+            {Math.min(terminalHeight - 6, logs.length - uiState.scrollPosition)}{" "}
+            of {logs.length} logs | ESC to go back
           </Text>
         </Box>
 
@@ -417,7 +419,10 @@ const TaskManager = () => {
             </Box>
           )}
           {logs
-            .slice(uiState.scrollPosition, uiState.scrollPosition + (terminalHeight - 6))
+            .slice(
+              uiState.scrollPosition,
+              uiState.scrollPosition + (terminalHeight - 6),
+            )
             .map((entry, i) => (
               <Box key={`log-${i + uiState.scrollPosition}`} marginTop={1}>
                 <Text bold color="yellow">
@@ -490,7 +495,10 @@ const TaskManager = () => {
       {/* Body - Fixed number of rows */}
       {Array.from({ length: terminalHeight - 1 }).map((_, lineIndex) => {
         const task = lineIndex < tasks.length ? tasks[lineIndex] : null;
-        const isSelected = lineIndex === selectedIndex && task !== null && lineIndex < tasks.length;
+        const isSelected =
+          lineIndex === selectedIndex &&
+          task !== null &&
+          lineIndex < tasks.length;
 
         let leftContent = "";
         let leftColor = "white";
