@@ -11,8 +11,13 @@ export class OpenAIProvider extends Provider {
   private client: OpenAI | null;
   private usedTools: string[] = [];
   private toolCalls: Record<string, any[]> = {};
+  private currentModel: string = "";
 
-  constructor(mcpServer: McpServer, promptText: string, config: ProviderConfig = {}) {
+  constructor(
+    mcpServer: McpServer,
+    promptText: string,
+    config: ProviderConfig = {},
+  ) {
     super(mcpServer, promptText, config);
     const apiKey = config.openaiApiKey || process.env.OPENAI_API_KEY;
     this.client = apiKey ? new OpenAI({ apiKey }) : null;
@@ -21,12 +26,13 @@ export class OpenAIProvider extends Provider {
   async stream(model: string): Promise<StreamResult> {
     if (!this.client) {
       throw new Error(
-        "OpenAI client not initialized. Please set OPENAI_API_KEY environment variable or pass openaiApiKey in config."
+        "OpenAI client not initialized. Please set OPENAI_API_KEY environment variable or pass openaiApiKey in config.",
       );
     }
 
     this.usedTools = [];
     this.toolCalls = {};
+    this.currentModel = model;
 
     const response = await this.client.responses.create({
       model: model as ChatModel,
@@ -47,7 +53,43 @@ export class OpenAIProvider extends Provider {
 
     let content = "";
 
+    process.stdout.write(
+      JSON.stringify({
+        type: "model_stream",
+        model: model,
+        text: `Starting ${model} execution...\n`,
+      }) + "\n",
+    );
+
     for await (const chunk of response) {
+      if (chunk.type === "response.output_item.added") {
+        const item = chunk.item;
+        if (item.type === "mcp_call") {
+          const toolName = item.name;
+          this.usedTools.push(toolName);
+          
+          if (!this.toolCalls[toolName]) {
+            this.toolCalls[toolName] = [];
+          }
+          
+          this.toolCalls[toolName].push({
+            args: item.arguments || {},
+            result: null
+          });
+        }
+      } else if (chunk.type === "response.output_item.done") {
+        const item = chunk.item;
+        if (item.type === "mcp_call") {
+          const toolName = item.name;
+          if (this.toolCalls[toolName] && this.toolCalls[toolName].length > 0) {
+            const lastCall = this.toolCalls[toolName][this.toolCalls[toolName].length - 1];
+            if (lastCall) {
+              lastCall.result = (item as any).result || { id: `result_${Date.now()}`, status: "completed" };
+            }
+          }
+        }
+      }
+      
       await this.processChunk(chunk);
     }
 
@@ -59,34 +101,34 @@ export class OpenAIProvider extends Provider {
 
     if (chunk.type === "response.output_item.added") {
       const item = chunk.item;
-      
+
       if (item.type === "mcp_call") {
         return {
-          type: 'tool_call_start',
-          provider: 'openai',
+          type: "tool_call_start",
+          provider: "openai",
           timestamp,
           data: {
             toolName: item.name,
-            toolArgs: item.arguments || {}
+            toolArgs: item.arguments || {},
           },
-          originalChunk: chunk
+          originalChunk: chunk,
         };
       }
     }
 
     if (chunk.type === "response.output_item.done") {
       const item = chunk.item;
-      
+
       if (item.type === "mcp_call") {
         return {
-          type: 'tool_call_done',
-          provider: 'openai',
+          type: "tool_call_done",
+          provider: "openai",
           timestamp,
           data: {
             toolName: item.name,
-            toolResult: item.result
+            toolResult: item.result,
           },
-          originalChunk: chunk
+          originalChunk: chunk,
         };
       }
     }
@@ -94,30 +136,53 @@ export class OpenAIProvider extends Provider {
     return null;
   }
 
-  protected async processNormalizedChunk(normalizedChunk: NormalizedChunk): Promise<void> {
+  protected async processNormalizedChunk(
+    normalizedChunk: NormalizedChunk,
+  ): Promise<void> {
     await super.processNormalizedChunk(normalizedChunk);
 
     // Backward compatibility
-    if (normalizedChunk.type === 'tool_call_start') {
+    if (normalizedChunk.type === "tool_call_start") {
       const toolName = normalizedChunk.data.toolName;
       if (toolName) {
         this.usedTools.push(toolName);
-        
+
+        process.stdout.write(
+          JSON.stringify({
+            type: "model_stream",
+            model: this.currentModel,
+            text: `Calling tool: ${toolName}\n`,
+          }) + "\n"
+        );
+
         if (!this.toolCalls[toolName]) {
           this.toolCalls[toolName] = [];
         }
-        
+
         this.toolCalls[toolName].push({
           args: normalizedChunk.data.toolArgs || {},
-          result: null
+          result: null,
         });
       }
-    } else if (normalizedChunk.type === 'tool_call_done') {
+    } else if (normalizedChunk.type === "tool_call_done") {
       const toolName = normalizedChunk.data.toolName;
-      if (toolName && this.toolCalls[toolName] && this.toolCalls[toolName].length > 0) {
-        const lastCall = this.toolCalls[toolName][this.toolCalls[toolName].length - 1];
+      if (
+        toolName &&
+        this.toolCalls[toolName] &&
+        this.toolCalls[toolName].length > 0
+      ) {
+        const lastCall =
+          this.toolCalls[toolName][this.toolCalls[toolName].length - 1];
         if (lastCall) {
           lastCall.result = { id: `result_${Date.now()}`, status: "completed" };
+
+          process.stdout.write(
+            JSON.stringify({
+              type: "model_stream",
+              model: this.currentModel,
+              text: `Tool ${toolName} completed\n`,
+            }) + "\n"
+          );
         }
       }
     }

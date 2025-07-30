@@ -1,13 +1,14 @@
 {
   "name": "mcp-check",
   "module": "index.ts",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "devDependencies": {
     "@types/bun": "latest",
     "@types/jest": "^30.0.0",
+    "@types/react": "^19.1.8",
     "jest": "^30.0.5",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2"
@@ -18,12 +19,11 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",
     "@modelcontextprotocol/sdk": "^1.16.0",
-    "bun-plugin-dts": "^0.3.0",
-    "dotenv": "^16.4.7",
     "glob": "^11.0.0",
-    "mcp-check-agents": "^0.1.0",
+    "ink": "^6.1.0",
     "openai": "^5.10.1",
-    "tsx": "^4.19.2",
+    "react": "^19.1.1",
+    "string-width": "^7.2.0",
     "zod": "^3.24.4"
   },
   "description": "",
@@ -35,11 +35,13 @@
     }
   },
   "bin": {
-    "mcp-check": "./bin/mcp-check.cjs"
+    "mcp-check": "./bin/mcp-check"
   },
   "scripts": {
     "build": "tsup",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "test": "./bin/mcp-test",
+    "test:jest": "jest"
   },
   "files": [
     "dist",
@@ -48,5 +50,10 @@
   ],
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/runbasehq/mcp-check.git"
+  },
+  "homepage": "https://github.com/runbasehq/mcp-check#readme"
 }

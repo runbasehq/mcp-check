@@ -12,8 +12,13 @@ export class AnthropicProvider extends Provider {
   private usedTools: string[] = [];
   private toolCalls: Record<string, any[]> = {};
   private content: string = "";
+  private currentModel: string = "";
 
-  constructor(mcpServer: McpServer, promptText: string, config: ProviderConfig = {}) {
+  constructor(
+    mcpServer: McpServer,
+    promptText: string,
+    config: ProviderConfig = {},
+  ) {
     super(mcpServer, promptText, config);
     const apiKey = config.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
     this.client = apiKey ? new Anthropic({ apiKey }) : null;
@@ -22,7 +27,7 @@ export class AnthropicProvider extends Provider {
   async stream(model: string): Promise<StreamResult> {
     if (!this.client) {
       throw new Error(
-        "Anthropic client not initialized. Please set ANTHROPIC_API_KEY environment variable or pass anthropicApiKey in config."
+        "Anthropic client not initialized. Please set ANTHROPIC_API_KEY environment variable or pass anthropicApiKey in config.",
       );
     }
 
@@ -30,6 +35,7 @@ export class AnthropicProvider extends Provider {
     this.toolCalls = {};
     this.currentToolName = null;
     this.content = "";
+    this.currentModel = model;
 
     const stream = this.client.beta.messages.stream({
       model: model as Anthropic.Model,
@@ -51,7 +57,33 @@ export class AnthropicProvider extends Provider {
       betas: ["mcp-client-2025-04-04"],
     });
 
+    process.stdout.write(
+      JSON.stringify({
+        type: "model_stream",
+        model: model,
+        text: `Starting ${model} execution...\n`,
+      }) + "\n",
+    );
+
+
     for await (const chunk of stream) {
+      if (
+        chunk.type === "content_block_start" &&
+        chunk.content_block.type === "mcp_tool_use"
+      ) {
+        const toolName = chunk.content_block.name;
+        this.usedTools.push(toolName);
+        
+        if (!this.toolCalls[toolName]) {
+          this.toolCalls[toolName] = [];
+        }
+        
+        this.toolCalls[toolName].push({
+          args: chunk.content_block.input || {},
+          result: null
+        });
+      }
+      
       await this.processChunk(chunk);
     }
 
@@ -64,8 +96,12 @@ export class AnthropicProvider extends Provider {
           // Find the tool call by matching with the order of tool executions
           const toolNames = Object.keys(this.toolCalls);
           for (const toolName of toolNames) {
-            if (this.toolCalls[toolName] && this.toolCalls[toolName].length > 0) {
-              const lastCall = this.toolCalls[toolName][this.toolCalls[toolName].length - 1];
+            if (
+              this.toolCalls[toolName] &&
+              this.toolCalls[toolName].length > 0
+            ) {
+              const lastCall =
+                this.toolCalls[toolName][this.toolCalls[toolName].length - 1];
               if (lastCall && lastCall.result === null) {
                 lastCall.result = block.content;
                 break;
@@ -76,7 +112,11 @@ export class AnthropicProvider extends Provider {
       }
     }
 
-    return { usedTools: this.usedTools, content: this.content, toolCalls: this.toolCalls };
+    return {
+      usedTools: this.usedTools,
+      content: this.content,
+      toolCalls: this.toolCalls,
+    };
   }
 
   protected normalizeChunk(chunk: any): NormalizedChunk | null {
@@ -84,6 +124,13 @@ export class AnthropicProvider extends Provider {
 
     if (chunk.type === "content_block_delta") {
       if (chunk.delta.type === "text_delta") {
+        process.stdout.write(
+          JSON.stringify({
+            type: "model_stream",
+            model: this.currentModel,
+            text: chunk.delta.text,
+          }) + "\n"
+        );
         return {
           type: "text_delta",
           provider: "anthropic",
@@ -103,7 +150,7 @@ export class AnthropicProvider extends Provider {
     }
 
     if (chunk.type === "content_block_start") {
-      if (chunk.content_block.type === "mcp_tool_use") {
+        if (chunk.content_block.type === "mcp_tool_use") {
         this.currentToolName = chunk.content_block.name;
         return {
           type: "tool_call_start",
@@ -119,7 +166,6 @@ export class AnthropicProvider extends Provider {
       }
     }
 
-    // Handle tool call end
     if (chunk.type === "content_block_stop") {
       if (this.currentToolName) {
         const toolName = this.currentToolName;
@@ -160,15 +206,15 @@ export class AnthropicProvider extends Provider {
     return null;
   }
 
-  protected async processNormalizedChunk(normalizedChunk: NormalizedChunk): Promise<void> {
+  protected async processNormalizedChunk(
+    normalizedChunk: NormalizedChunk,
+  ): Promise<void> {
     await super.processNormalizedChunk(normalizedChunk);
 
-    // Backward compatibility
     if (normalizedChunk.type === "text_delta") {
       const text = normalizedChunk.data.text;
       if (text) {
         this.content += text;
-        process.stdout.write(text);
       }
     } else if (normalizedChunk.type === "tool_call_start") {
       const toolName = normalizedChunk.data.toolName;
