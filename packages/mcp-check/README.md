@@ -58,12 +58,16 @@ const mcpServer = new McpServer({
 });
 ```
 
-### client(mcpServer, models)
+### client(mcpServer, models, config?)
 
 Create a client instance to execute prompts:
 
 ```typescript
-const agent = client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"])
+const agent = client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"], {
+  // Provider-specific API keys (optional - can also use environment variables)
+  anthropicApiKey: "your-anthropic-key-here",
+  openaiApiKey: "your-openai-key-here"
+})
   .prompt("Your prompt here")
   .execute();
 ```
@@ -71,6 +75,10 @@ const agent = client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"])
 **Parameters:**
 - `mcpServer`: Configured MCP server instance
 - `models`: Array of AI model names to use
+- `config`: Optional configuration object
+  - `anthropicApiKey`: API key for Anthropic models
+  - `openaiApiKey`: API key for OpenAI models
+
 
 **Supported Models:**
 - Claude models: `claude-3-haiku-20240307`, `claude-3-5-sonnet-20240620`, etc.
@@ -114,7 +122,16 @@ const mcpServer = new McpServer({
 
 describe("MCP Server Tests", () => {
   test("should use expected tools", async () => {
+    // Option 1: Use environment variables (no config needed)
     const agent = await client(mcpServer, ["claude-3-haiku-20240307"])
+      .prompt("Update the content using the available tools.")
+      .execute();
+
+    // Option 2: Pass API keys directly in config
+    const agentWithConfig = await client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"], {
+      anthropicApiKey: "your-anthropic-key-here",
+      openaiApiKey: "your-openai-key-here"
+    })
       .prompt("Update the content using the available tools.")
       .execute();
 

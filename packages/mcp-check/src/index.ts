@@ -1,15 +1,20 @@
-import Anthropic from "@anthropic-ai/sdk";
-import type { ChatModel } from "openai/resources";
-import { createProvider } from "./utils.js";
+import { createProvider } from "./providers";
+import type { ProviderConfig } from "./providers/types";
+import type { ModelName, Models } from "./providers";
 
-export type AnthropicModel = Anthropic.Model;
-export type OpenAIModel = ChatModel;
+export type { ModelName, Models } from "./providers";
 
-export type ModelName = AnthropicModel | OpenAIModel;
-export type Models = ModelName[];
+export {
+  ChunkNormalizer,
+  type NormalizedChunk,
+  type NormalizedChunkType,
+  type ChunkHandlerConfig,
+  type ChunkCallback,
+  type ChunkTypeCallback,
+} from "./chunks";
 
-export function client(mcpServer: McpServer, tools: Models): Agents {
-  return new Agents(mcpServer, tools);
+export function client(mcpServer: McpServer, tools: Models, config: ProviderConfig = {}): Agents {
+  return new Agents(mcpServer, tools, config);
 }
 
 export class McpServer {
@@ -18,17 +23,7 @@ export class McpServer {
   public name: string;
   public type: string;
 
-  constructor({
-    url,
-    authorizationToken,
-    name,
-    type,
-  }: {
-    url: string;
-    authorizationToken: string;
-    name: string;
-    type: string;
-  }) {
+  constructor({ url, authorizationToken, name, type }: { url: string; authorizationToken: string; name: string; type: string }) {
     this.url = url;
     this.authorizationToken = authorizationToken;
     this.name = name;
@@ -44,10 +39,12 @@ export class Agents {
   private models: Models = [];
   private mcpServer: McpServer | null = null;
   private executionPromises: Promise<this>[] = [];
+  private config: ProviderConfig;
 
-  constructor(mcpServer: McpServer, models: (AnthropicModel | OpenAIModel)[]) {
+  constructor(mcpServer: McpServer, models: ModelName[], config: ProviderConfig = {}) {
     this.models = models;
     this.mcpServer = mcpServer;
+    this.config = config;
   }
 
   prompt(text: string): this {
@@ -66,7 +63,7 @@ export class Agents {
     }
 
     this.executionPromises = this.models.map(async (model) => {
-      const provider = createProvider(model, this.mcpServer!, this.promptText);
+      const provider = createProvider(model, this.mcpServer!, this.promptText, this.config);
       const result = await provider.stream(model);
       this.usedTools[model] = result.usedTools;
       this.toolCalls[model] = result.toolCalls;

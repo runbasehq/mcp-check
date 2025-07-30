@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.2.3
+
+### Patch Changes
+
+- Introduced a terminal UI using Ink to visualize streamed output from different AI models during execution with npx mcp-check.
+
 ## 0.2.2
 
 ### Patch Changes
