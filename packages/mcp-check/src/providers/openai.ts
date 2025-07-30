@@ -1,13 +1,16 @@
 import OpenAI from "openai";
 import type { ChatModel } from "openai/resources";
 import { Provider } from "./provider.js";
-import type { StreamResult, ProviderConfig } from "./types.js";
+import type { StreamResult, NormalizedChunk } from "../chunks/types.js";
+import type { ProviderConfig } from "./types.js";
 import type { McpServer } from "../index.js";
 
 export type OpenAIModel = ChatModel;
 
 export class OpenAIProvider extends Provider {
   private client: OpenAI | null;
+  private usedTools: string[] = [];
+  private toolCalls: Record<string, any[]> = {};
 
   constructor(mcpServer: McpServer, promptText: string, config: ProviderConfig = {}) {
     super(mcpServer, promptText, config);
@@ -21,6 +24,9 @@ export class OpenAIProvider extends Provider {
         "OpenAI client not initialized. Please set OPENAI_API_KEY environment variable or pass openaiApiKey in config."
       );
     }
+
+    this.usedTools = [];
+    this.toolCalls = {};
 
     const response = await this.client.responses.create({
       model: model as ChatModel,
@@ -39,41 +45,81 @@ export class OpenAIProvider extends Provider {
       stream: true,
     });
 
-    const usedTools: string[] = [];
-    const toolCalls: Record<string, any[]> = {};
     let content = "";
 
     for await (const chunk of response) {
-      if (chunk.type === "response.output_item.added") {
-        const item = chunk.item;
-        if (item.type === "mcp_call") {
-          const toolName = item.name;
-          usedTools.push(toolName);
-          
-          if (!toolCalls[toolName]) {
-            toolCalls[toolName] = [];
-          }
-          
-          toolCalls[toolName].push({
-            args: item.arguments || {},
-            result: null
-          });
-        }
-      } else if (chunk.type === "response.output_item.done") {
-        const item = chunk.item;
-        if (item.type === "mcp_call") {
-          // Update the most recent tool call result
-          const toolName = item.name;
-          if (toolCalls[toolName] && toolCalls[toolName].length > 0) {
-            const lastCall = toolCalls[toolName][toolCalls[toolName].length - 1];
-            if (lastCall) {
-              lastCall.result = { id: `result_${Date.now()}`, status: "completed" };
-            }
-          }
-        }
+      await this.processChunk(chunk);
+    }
+
+    return { usedTools: this.usedTools, content, toolCalls: this.toolCalls };
+  }
+
+  protected normalizeChunk(chunk: any): NormalizedChunk | null {
+    const timestamp = Date.now();
+
+    if (chunk.type === "response.output_item.added") {
+      const item = chunk.item;
+      
+      if (item.type === "mcp_call") {
+        return {
+          type: 'tool_call_start',
+          provider: 'openai',
+          timestamp,
+          data: {
+            toolName: item.name,
+            toolArgs: item.arguments || {}
+          },
+          originalChunk: chunk
+        };
       }
     }
 
-    return { usedTools, content, toolCalls };
+    if (chunk.type === "response.output_item.done") {
+      const item = chunk.item;
+      
+      if (item.type === "mcp_call") {
+        return {
+          type: 'tool_call_done',
+          provider: 'openai',
+          timestamp,
+          data: {
+            toolName: item.name,
+            toolResult: item.result
+          },
+          originalChunk: chunk
+        };
+      }
+    }
+
+    return null;
+  }
+
+  protected async processNormalizedChunk(normalizedChunk: NormalizedChunk): Promise<void> {
+    await super.processNormalizedChunk(normalizedChunk);
+
+    // Backward compatibility
+    if (normalizedChunk.type === 'tool_call_start') {
+      const toolName = normalizedChunk.data.toolName;
+      if (toolName) {
+        this.usedTools.push(toolName);
+        
+        if (!this.toolCalls[toolName]) {
+          this.toolCalls[toolName] = [];
+        }
+        
+        this.toolCalls[toolName].push({
+          args: normalizedChunk.data.toolArgs || {},
+          result: null
+        });
+      }
+    } else if (normalizedChunk.type === 'tool_call_done') {
+      const toolName = normalizedChunk.data.toolName;
+      if (toolName && this.toolCalls[toolName] && this.toolCalls[toolName].length > 0) {
+        const lastCall = this.toolCalls[toolName][this.toolCalls[toolName].length - 1];
+        if (lastCall) {
+          lastCall.result = { id: `result_${Date.now()}`, status: "completed" };
+        }
+      }
+    }
   }
 }

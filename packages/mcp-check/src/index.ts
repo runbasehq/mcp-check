@@ -4,6 +4,15 @@ import type { ModelName, Models } from "./providers";
 
 export type { ModelName, Models } from "./providers";
 
+export {
+  ChunkNormalizer,
+  type NormalizedChunk,
+  type NormalizedChunkType,
+  type ChunkHandlerConfig,
+  type ChunkCallback,
+  type ChunkTypeCallback,
+} from "./chunks";
+
 export function client(mcpServer: McpServer, tools: Models, config: ProviderConfig = {}): Agents {
   return new Agents(mcpServer, tools, config);
 }
