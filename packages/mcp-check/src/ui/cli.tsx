@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { render, Box, Text, useInput } from "ink";
 import { spawn } from "child_process";
 import { glob } from "glob";
@@ -6,9 +6,12 @@ import path from "path";
 import stringWidth from "string-width";
 
 interface Task {
+  id: string;
   name: string;
-  selected: boolean;
   type: "jest" | "model";
+  status: "running" | "completed" | "failed";
+  logs: LogEntry[];
+  orderIndex: number; // Fixed order position
 }
 
 interface LogEntry {
@@ -35,38 +38,90 @@ const getJestTests = async (): Promise<string[]> => {
   }
 };
 
+// Simplified log batching
+class SimpleLogBatcher {
+  private updateTimer: NodeJS.Timeout | null = null;
+  private onUpdate: () => void;
+
+  constructor(onUpdate: () => void) {
+    this.onUpdate = onUpdate;
+  }
+
+  scheduleUpdate() {
+    if (this.updateTimer) return;
+    this.updateTimer = setTimeout(() => {
+      this.updateTimer = null;
+      this.onUpdate();
+    }, 50);
+  }
+
+  destroy() {
+    if (this.updateTimer) {
+      clearTimeout(this.updateTimer);
+    }
+  }
+}
+
 const runJestCommand = (
   jestTasks: string[],
-  onLogUpdate: (taskName: string, logs: LogEntry[]) => void,
-  onStatusUpdate: (
-    taskName: string,
-    status: "running" | "completed" | "failed",
-  ) => void,
-  onModelDiscovered: (modelName: string) => void,
+  onTaskUpdate: (updatedTasks: Task[]) => void,
+  initialTasks: Task[],
 ): Promise<void> => {
   return new Promise((resolve) => {
-    const jestLogs: LogEntry[] = [];
-    const modelLogs: Record<string, LogEntry[]> = {};
-    const modelBuffers: Record<string, string> = {};
+    const tasks = new Map<string, Task>();
+    let nextOrderIndex = 0;
 
-    const addJestLog = (entry: LogEntry) => {
-      jestLogs.push(entry);
-      jestTasks.forEach((taskName) => {
-        onLogUpdate(taskName, [...jestLogs]);
-      });
+    // Initialize with jest tasks
+    initialTasks.forEach((task) => {
+      tasks.set(task.name, { ...task, orderIndex: nextOrderIndex++ });
+    });
+
+    const logBatcher = new SimpleLogBatcher(() => {
+      const sortedTasks = Array.from(tasks.values()).sort(
+        (a, b) => a.orderIndex - b.orderIndex,
+      );
+      onTaskUpdate([...sortedTasks]);
+    });
+
+    const modelBuffers: Record<string, string> = {};
+    const modelFlushTimers: Record<string, NodeJS.Timeout> = {};
+
+    const addLogToTask = (taskName: string, entry: LogEntry) => {
+      const task = tasks.get(taskName);
+      if (task) {
+        task.logs.push(entry);
+        logBatcher.scheduleUpdate();
+      }
     };
 
-    const addModelLog = (modelName: string, entry: LogEntry) => {
-      if (!modelLogs[modelName]) {
-        modelLogs[modelName] = [];
+    const updateTaskStatus = (
+      taskName: string,
+      status: "running" | "completed" | "failed",
+    ) => {
+      const task = tasks.get(taskName);
+      if (task) {
+        task.status = status;
+        logBatcher.scheduleUpdate();
       }
-      modelLogs[modelName].push(entry);
-      onLogUpdate(modelName, [...modelLogs[modelName]]);
+    };
+
+    const scheduleModelFlush = (modelName: string) => {
+      if (modelFlushTimers[modelName]) {
+        clearTimeout(modelFlushTimers[modelName]);
+      }
+      modelFlushTimers[modelName] = setTimeout(() => {
+        flushModelBuffer(modelName);
+      }, 200);
     };
 
     const flushModelBuffer = (modelName: string) => {
+      if (modelFlushTimers[modelName]) {
+        clearTimeout(modelFlushTimers[modelName]);
+        delete modelFlushTimers[modelName];
+      }
+
       if (modelBuffers[modelName]?.trim()) {
-        addModelLog(modelName, {
+        addLogToTask(modelName, {
           timestamp: new Date().toISOString(),
           thread: "",
           service: modelName,
@@ -94,11 +149,14 @@ const runJestCommand = (
       },
     );
 
-    addJestLog({
-      timestamp: new Date().toISOString(),
-      thread: "",
-      service: "jest",
-      message: "Starting Jest tests...",
+    // Add initial log to jest tasks
+    jestTasks.forEach((taskName) => {
+      addLogToTask(taskName, {
+        timestamp: new Date().toISOString(),
+        thread: "",
+        service: "jest",
+        message: "Starting Jest tests...",
+      });
     });
 
     child.stdout.on("data", (data) => {
@@ -111,14 +169,22 @@ const runJestCommand = (
           const streamData = JSON.parse(line.trim());
           if (streamData?.type === "model_stream" && streamData.text) {
             const modelName = streamData?.model ?? "";
-            if (modelName && !modelLogs[modelName]) {
-              onModelDiscovered(modelName);
+            if (modelName && !tasks.has(modelName)) {
+              // Add new model task
+              tasks.set(modelName, {
+                id: `model-${modelName}`,
+                name: modelName,
+                type: "model",
+                status: "running",
+                logs: [],
+                orderIndex: nextOrderIndex++,
+              });
             }
-            modelBuffers[modelName] =
-              (modelBuffers[modelName] || "") + streamData.text;
-            const buf = modelBuffers[modelName];
-            if (buf.length > 50 || /[.!?\n]/.test(buf)) {
-              flushModelBuffer(modelName);
+
+            if (modelName) {
+              modelBuffers[modelName] =
+                (modelBuffers[modelName] || "") + streamData.text;
+              scheduleModelFlush(modelName);
             }
             return;
           }
@@ -134,11 +200,13 @@ const runJestCommand = (
           .split("\n")
           .filter((line) => line.trim());
         outputLines.forEach((line) => {
-          addJestLog({
-            timestamp: new Date().toISOString(),
-            thread: "",
-            service: "jest",
-            message: line.trim(),
+          jestTasks.forEach((taskName) => {
+            addLogToTask(taskName, {
+              timestamp: new Date().toISOString(),
+              thread: "",
+              service: "jest",
+              message: line.trim(),
+            });
           });
         });
       }
@@ -147,44 +215,58 @@ const runJestCommand = (
     child.stderr.on("data", (data) => {
       const msg = data.toString().trim();
       if (msg) {
-        addJestLog({
-          timestamp: new Date().toISOString(),
-          thread: "",
-          service: "jest",
-          message: msg,
+        jestTasks.forEach((taskName) => {
+          addLogToTask(taskName, {
+            timestamp: new Date().toISOString(),
+            thread: "",
+            service: "jest",
+            message: msg,
+          });
         });
       }
     });
 
     child.on("close", (code) => {
+      // Clean up timers
+      Object.keys(modelFlushTimers).forEach((modelName) => {
+        clearTimeout(modelFlushTimers[modelName]);
+      });
       Object.keys(modelBuffers).forEach(flushModelBuffer);
 
-      addJestLog({
-        timestamp: new Date().toISOString(),
-        thread: "",
-        service: "jest",
-        message: `Jest tests completed with exit code: ${code}`,
+      // Final log update
+      jestTasks.forEach((taskName) => {
+        addLogToTask(taskName, {
+          timestamp: new Date().toISOString(),
+          thread: "",
+          service: "jest",
+          message: `Jest tests completed with exit code: ${code}`,
+        });
       });
 
+      // Update all task statuses
       const status = code === 0 ? "completed" : "failed";
-      jestTasks.forEach((taskName) => {
-        onStatusUpdate(taskName, status);
+      tasks.forEach((task) => {
+        if (task.type === "jest") {
+          updateTaskStatus(task.name, status);
+        } else {
+          updateTaskStatus(task.name, "completed");
+        }
       });
-      Object.keys(modelLogs).forEach((model) =>
-        onStatusUpdate(model, "completed"),
-      );
+
+      logBatcher.destroy();
       resolve();
     });
 
     child.on("error", (error) => {
-      addJestLog({
-        timestamp: new Date().toISOString(),
-        thread: "",
-        service: "jest",
-        message: `Jest error: ${error.message}`,
-      });
+      logBatcher.destroy();
       jestTasks.forEach((taskName) => {
-        onStatusUpdate(taskName, "completed");
+        addLogToTask(taskName, {
+          timestamp: new Date().toISOString(),
+          thread: "",
+          service: "jest",
+          message: `Jest error: ${error.message}`,
+        });
+        updateTaskStatus(taskName, "completed");
       });
       resolve();
     });
@@ -193,7 +275,6 @@ const runJestCommand = (
 
 const padToWidth = (str: string, width: number): string => {
   const currentWidth = stringWidth(str);
-
   if (currentWidth >= width) {
     let result = "";
     for (const char of str) {
@@ -202,7 +283,6 @@ const padToWidth = (str: string, width: number): string => {
     }
     return result + " ".repeat(Math.max(0, width - stringWidth(result)));
   }
-
   return str + " ".repeat(width - currentWidth);
 };
 
@@ -214,25 +294,21 @@ const getStatusIndicator = (
     const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     return frames[frame % frames.length];
   }
-  if (status === "failed") {
-    return "✗";
-  }
+  if (status === "failed") return "✗";
   return "✓";
 };
 
 const TaskManager = () => {
-  const [selectedTask, setSelectedTask] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [taskLogs, setTaskLogs] = useState<Record<string, LogEntry[]>>({});
-  const [taskStatus, setTaskStatus] = useState<
-    Record<string, "running" | "completed" | "failed">
-  >({});
   const [uiState, setUIState] = useState<UIState>({
     mode: "task-list",
     scrollPosition: 0,
   });
   const [animationFrame, setAnimationFrame] = useState(0);
+  const isInitialized = useRef(false);
 
+  // Animation timer
   useEffect(() => {
     const timer = setInterval(() => {
       setAnimationFrame((f) => f + 1);
@@ -240,83 +316,62 @@ const TaskManager = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const handleLogUpdate = (taskName: string, logs: LogEntry[]) => {
-    setTaskLogs((prev) => ({ ...prev, [taskName]: logs }));
-  };
-
-  const handleStatusUpdate = (
-    taskName: string,
-    status: "running" | "completed" | "failed",
-  ) => {
-    setTaskStatus((prev) => ({ ...prev, [taskName]: status }));
-  };
-
+  // Initialize tasks
   useEffect(() => {
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
     const loadAndExecute = async () => {
       try {
         const jestTests = await getJestTests();
-        const models: string[] = [];
 
-        const allTasks: Task[] = [
-          ...jestTests.map((name) => ({
-            name,
-            selected: false,
-            type: "jest" as const,
-          })),
-          ...models.map((name) => ({
-            name,
-            selected: false,
-            type: "model" as const,
-          })),
-        ];
-        if (allTasks.length) {
-          allTasks[0].selected = true;
-        }
-        setTasks(allTasks);
-        setTaskStatus(
-          allTasks.reduce((acc, t) => ({ ...acc, [t.name]: "running" }), {}),
-        );
-        const handleModelDiscovered = (modelName: string) => {
-          setTasks((prevTasks) => {
-            if (prevTasks.some((t) => t.name === modelName)) return prevTasks;
-            const newTask = {
-              name: modelName,
-              selected: false,
-              type: "model" as const,
-            };
-            return [...prevTasks, newTask];
-          });
-          setTaskStatus((prevStatus) => ({
-            ...prevStatus,
-            [modelName]: "running",
-          }));
-        };
+        const initialTasks: Task[] = jestTests.map((name, index) => ({
+          id: `jest-${name}`,
+          name,
+          type: "jest" as const,
+          status: "running" as const,
+          logs: [],
+          orderIndex: index,
+        }));
 
-        runJestCommand(
+        setTasks(initialTasks);
+
+        await runJestCommand(
           jestTests,
-          handleLogUpdate,
-          handleStatusUpdate,
-          handleModelDiscovered,
+          (updatedTasks) => {
+            setTasks(updatedTasks);
+          },
+          initialTasks,
         );
       } catch (error) {
         console.error("Failed to initialize:", error);
         process.exit(1);
       }
     };
+
     loadAndExecute();
   }, []);
 
+  // Ensure valid selection
+  useEffect(() => {
+    if (tasks.length > 0 && selectedIndex >= tasks.length) {
+      setSelectedIndex(Math.max(0, tasks.length - 1));
+    }
+  }, [tasks.length, selectedIndex]);
+
+  const currentTask = tasks[selectedIndex] || null;
+
   useInput((input, key) => {
     if (uiState.mode === "task-list") {
-      if (key.upArrow && selectedTask > 0) {
-        setSelectedTask((i) => i - 1);
-      } else if (key.downArrow && selectedTask < tasks.length - 1) {
-        setSelectedTask((i) => i + 1);
-      } else if (key.return) {
+      if (key.upArrow && selectedIndex > 0) {
+        setSelectedIndex(selectedIndex - 1);
+      } else if (key.downArrow && selectedIndex < tasks.length - 1) {
+        setSelectedIndex(selectedIndex + 1);
+      } else if (key.return && currentTask) {
         setUIState({ mode: "task-detail", scrollPosition: 0 });
       }
     } else {
-      const logs = taskLogs[tasks[selectedTask]?.name] || [];
+      const logs = currentTask?.logs || [];
       if (key.upArrow && uiState.scrollPosition > 0) {
         setUIState((s) => ({ ...s, scrollPosition: s.scrollPosition - 1 }));
       } else if (key.downArrow && uiState.scrollPosition < logs.length - 10) {
@@ -328,16 +383,16 @@ const TaskManager = () => {
     if (input === "q") process.exit(0);
   });
 
-  if (uiState.mode === "task-detail") {
-    const task = tasks[selectedTask];
-    const logs = taskLogs[task.name] || [];
-    const status = taskStatus[task.name] || "running";
+  // Detail view
+  if (uiState.mode === "task-detail" && currentTask) {
+    const logs = currentTask.logs;
+    const status = currentTask.status;
 
     return (
       <Box flexDirection="column" height={TERMINAL_HEIGHT}>
         <Box>
           <Text bold color="white">
-            {task.name} -{" "}
+            {currentTask.name} -{" "}
             {status === "running"
               ? "Running..."
               : status === "failed"
@@ -363,7 +418,7 @@ const TaskManager = () => {
           {logs
             .slice(uiState.scrollPosition, uiState.scrollPosition + 10)
             .map((entry, i) => (
-              <Box key={i + uiState.scrollPosition} marginTop={1}>
+              <Box key={`log-${i + uiState.scrollPosition}`} marginTop={1}>
                 <Text bold color="yellow">
                   {entry.service}
                 </Text>
@@ -383,23 +438,21 @@ const TaskManager = () => {
     );
   }
 
+  // Build right panel content
   const rightLines: string[] = [];
-
   rightLines.push(
-    `${tasks[selectedTask]?.name || "No task"} - ${taskStatus[tasks[selectedTask]?.name] || "Loading..."}`,
+    `${currentTask?.name || "No task"} - ${currentTask?.status || "Loading..."}`,
   );
-
   rightLines.push(
-    `Logs: ${taskLogs[tasks[selectedTask]?.name]?.length || 0} entries | Press Enter to view details`,
+    `Logs: ${currentTask?.logs.length || 0} entries | Press Enter to view details`,
   );
-
   rightLines.push("");
 
-  if (tasks[selectedTask] && taskLogs[tasks[selectedTask].name]?.length > 0) {
+  if (currentTask && currentTask.logs.length > 0) {
     rightLines.push("Recent logs:");
     rightLines.push("");
 
-    const recentLogs = taskLogs[tasks[selectedTask].name].slice(-5);
+    const recentLogs = currentTask.logs.slice(-5);
     recentLogs.forEach((entry) => {
       const time = entry.timestamp.split("T")[1]?.split(".")[0];
       rightLines.push(`${entry.service} | ${time}`);
@@ -411,11 +464,8 @@ const TaskManager = () => {
     });
   }
 
-  if (
-    tasks[selectedTask] &&
-    taskStatus[tasks[selectedTask].name] === "running"
-  ) {
-    rightLines.push(`Running ${tasks[selectedTask].name}...`);
+  if (currentTask && currentTask.status === "running") {
+    rightLines.push(`Running ${currentTask.name}...`);
     rightLines.push("");
   }
 
@@ -437,57 +487,45 @@ const TaskManager = () => {
         <Text color="gray">{rightLines[0]}</Text>
       </Box>
 
+      {/* Body - Fixed number of rows */}
       {Array.from({ length: TERMINAL_HEIGHT - 1 }).map((_, lineIndex) => {
+        const task = lineIndex < tasks.length ? tasks[lineIndex] : null;
+        const isSelected = lineIndex === selectedIndex && task !== null;
+
         let leftContent = "";
         let leftColor = "white";
         let leftBg = undefined;
 
-        if (lineIndex < tasks.length) {
-          const task = tasks[lineIndex];
-          const status = taskStatus[task.name] || "running";
-          const isSelected = lineIndex === selectedTask;
-          const indicator = getStatusIndicator(status, animationFrame);
-
-          const fullText = `${indicator} ${task.name}`;
+        if (task) {
+          const indicator = getStatusIndicator(task.status, animationFrame);
+          const statusColor =
+            task.status === "running"
+              ? "yellow"
+              : task.status === "failed"
+                ? "red"
+                : "green";
 
           if (isSelected) {
-            leftContent = padToWidth(fullText, LEFT_COLUMN_WIDTH - 2) + " »";
+            leftContent = `${indicator} ${padToWidth(task.name, LEFT_COLUMN_WIDTH - 4)} »`;
             leftColor = "yellow";
             leftBg = "gray";
           } else {
-            leftContent = padToWidth(fullText, LEFT_COLUMN_WIDTH);
+            leftContent = `${indicator} ${padToWidth(task.name, LEFT_COLUMN_WIDTH - 2)}`;
+            leftColor = statusColor;
           }
         } else {
           leftContent = padToWidth("", LEFT_COLUMN_WIDTH);
         }
 
-        let statusColor = "white";
-        if (lineIndex < tasks.length) {
-          const status = taskStatus[tasks[lineIndex].name] || "running";
-          statusColor =
-            status === "running"
-              ? "yellow"
-              : status === "failed"
-                ? "red"
-                : "green";
-        }
-
         const rightContent = rightLines[lineIndex + 1] || "";
 
         return (
-          <Box key={`line-${lineIndex}`}>
-            {lineIndex < tasks.length && leftContent.length > 0 ? (
-              <Box width={LEFT_COLUMN_WIDTH}>
-                <Text color={statusColor}>{leftContent.charAt(0)} </Text>
-                <Text color={leftColor} backgroundColor={leftBg}>
-                  {leftContent.substring(2)}
-                </Text>
-              </Box>
-            ) : (
+          <Box key={`row-${lineIndex}`}>
+            <Box width={LEFT_COLUMN_WIDTH}>
               <Text color={leftColor} backgroundColor={leftBg}>
                 {leftContent}
               </Text>
-            )}
+            </Box>
             <Text color="gray">│ </Text>
             <Text
               color={
