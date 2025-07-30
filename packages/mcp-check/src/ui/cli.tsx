@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { render, Box, Text, useInput } from "ink";
+import { render, Box, Text, useInput, useStdout } from "ink";
 import { spawn } from "child_process";
 import { glob } from "glob";
 import path from "path";
@@ -26,7 +26,6 @@ interface UIState {
   scrollPosition: number;
 }
 
-const TERMINAL_HEIGHT = 20;
 const LEFT_COLUMN_WIDTH = 30;
 
 const getJestTests = async (): Promise<string[]> => {
@@ -307,6 +306,8 @@ const TaskManager = () => {
   });
   const [animationFrame, setAnimationFrame] = useState(0);
   const isInitialized = useRef(false);
+  const { stdout } = useStdout();
+  const terminalHeight = stdout?.rows || 20;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -374,7 +375,7 @@ const TaskManager = () => {
       const logs = currentTask?.logs || [];
       if (key.upArrow && uiState.scrollPosition > 0) {
         setUIState((s) => ({ ...s, scrollPosition: s.scrollPosition - 1 }));
-      } else if (key.downArrow && uiState.scrollPosition < logs.length - 10) {
+      } else if (key.downArrow && uiState.scrollPosition < logs.length - (terminalHeight - 6)) {
         setUIState((s) => ({ ...s, scrollPosition: s.scrollPosition + 1 }));
       } else if (key.escape || input === "q") {
         setUIState({ mode: "task-list", scrollPosition: 0 });
@@ -389,7 +390,7 @@ const TaskManager = () => {
     const status = currentTask.status;
 
     return (
-      <Box flexDirection="column" height={TERMINAL_HEIGHT}>
+      <Box flexDirection="column" height={terminalHeight}>
         <Box>
           <Text bold color="white">
             {currentTask.name} -{" "}
@@ -402,7 +403,7 @@ const TaskManager = () => {
         </Box>
         <Box>
           <Text color="gray">
-            Showing {Math.min(10, logs.length - uiState.scrollPosition)} of{" "}
+            Showing {Math.min(terminalHeight - 6, logs.length - uiState.scrollPosition)} of{" "}
             {logs.length} logs | ESC to go back
           </Text>
         </Box>
@@ -416,7 +417,7 @@ const TaskManager = () => {
             </Box>
           )}
           {logs
-            .slice(uiState.scrollPosition, uiState.scrollPosition + 10)
+            .slice(uiState.scrollPosition, uiState.scrollPosition + (terminalHeight - 6))
             .map((entry, i) => (
               <Box key={`log-${i + uiState.scrollPosition}`} marginTop={1}>
                 <Text bold color="yellow">
@@ -468,7 +469,7 @@ const TaskManager = () => {
     rightLines.push("");
   }
 
-  while (rightLines.length < TERMINAL_HEIGHT - 2) {
+  while (rightLines.length < terminalHeight - 2) {
     rightLines.push("");
   }
 
@@ -476,7 +477,7 @@ const TaskManager = () => {
   rightLines.push("Auto-running tests and models");
 
   return (
-    <Box flexDirection="column" height={TERMINAL_HEIGHT}>
+    <Box flexDirection="column" height={terminalHeight}>
       {/* Header */}
       <Box>
         <Text bold color="white">
@@ -487,7 +488,7 @@ const TaskManager = () => {
       </Box>
 
       {/* Body - Fixed number of rows */}
-      {Array.from({ length: TERMINAL_HEIGHT - 1 }).map((_, lineIndex) => {
+      {Array.from({ length: terminalHeight - 1 }).map((_, lineIndex) => {
         const task = lineIndex < tasks.length ? tasks[lineIndex] : null;
         const isSelected = lineIndex === selectedIndex && task !== null && lineIndex < tasks.length;
 
@@ -532,7 +533,7 @@ const TaskManager = () => {
                   ? "white"
                   : rightContent.includes(" | ")
                     ? "yellow"
-                    : lineIndex + 1 >= TERMINAL_HEIGHT - 2
+                    : lineIndex + 1 >= terminalHeight - 2
                       ? "gray"
                       : "gray"
               }
