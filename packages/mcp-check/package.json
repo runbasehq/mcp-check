@@ -1,7 +1,7 @@
 {
   "name": "mcp-check",
   "module": "index.ts",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
