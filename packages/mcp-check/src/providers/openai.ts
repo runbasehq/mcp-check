@@ -62,6 +62,34 @@ export class OpenAIProvider extends Provider {
     );
 
     for await (const chunk of response) {
+      if (chunk.type === "response.output_item.added") {
+        const item = chunk.item;
+        if (item.type === "mcp_call") {
+          const toolName = item.name;
+          this.usedTools.push(toolName);
+          
+          if (!this.toolCalls[toolName]) {
+            this.toolCalls[toolName] = [];
+          }
+          
+          this.toolCalls[toolName].push({
+            args: item.arguments || {},
+            result: null
+          });
+        }
+      } else if (chunk.type === "response.output_item.done") {
+        const item = chunk.item;
+        if (item.type === "mcp_call") {
+          const toolName = item.name;
+          if (this.toolCalls[toolName] && this.toolCalls[toolName].length > 0) {
+            const lastCall = this.toolCalls[toolName][this.toolCalls[toolName].length - 1];
+            if (lastCall) {
+              lastCall.result = (item as any).result || { id: `result_${Date.now()}`, status: "completed" };
+            }
+          }
+        }
+      }
+      
       await this.processChunk(chunk);
     }
 

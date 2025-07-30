@@ -67,6 +67,23 @@ export class AnthropicProvider extends Provider {
 
 
     for await (const chunk of stream) {
+      if (
+        chunk.type === "content_block_start" &&
+        chunk.content_block.type === "mcp_tool_use"
+      ) {
+        const toolName = chunk.content_block.name;
+        this.usedTools.push(toolName);
+        
+        if (!this.toolCalls[toolName]) {
+          this.toolCalls[toolName] = [];
+        }
+        
+        this.toolCalls[toolName].push({
+          args: chunk.content_block.input || {},
+          result: null
+        });
+      }
+      
       await this.processChunk(chunk);
     }
 
