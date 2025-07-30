@@ -16,7 +16,7 @@ export function createProvider(
   model: ModelName,
   mcpServer: McpServer,
   promptText: string,
-  config: ProviderConfig = {}
+  config: ProviderConfig = {},
 ): Provider {
   // Anthropic models
   if (model.startsWith("claude-")) {

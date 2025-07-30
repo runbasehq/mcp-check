@@ -12,6 +12,7 @@ export class AnthropicProvider extends Provider {
   private usedTools: string[] = [];
   private toolCalls: Record<string, any[]> = {};
   private content: string = "";
+  private currentModel: string = "";
 
   constructor(
     mcpServer: McpServer,
@@ -34,6 +35,7 @@ export class AnthropicProvider extends Provider {
     this.toolCalls = {};
     this.currentToolName = null;
     this.content = "";
+    this.currentModel = model;
 
     const stream = this.client.beta.messages.stream({
       model: model as Anthropic.Model,
@@ -54,6 +56,15 @@ export class AnthropicProvider extends Provider {
       ],
       betas: ["mcp-client-2025-04-04"],
     });
+
+    process.stdout.write(
+      JSON.stringify({
+        type: "model_stream",
+        model: model,
+        text: `Starting ${model} execution...\n`,
+      }) + "\n",
+    );
+
 
     for await (const chunk of stream) {
       await this.processChunk(chunk);
@@ -96,6 +107,13 @@ export class AnthropicProvider extends Provider {
 
     if (chunk.type === "content_block_delta") {
       if (chunk.delta.type === "text_delta") {
+        process.stdout.write(
+          JSON.stringify({
+            type: "model_stream",
+            model: this.currentModel,
+            text: chunk.delta.text,
+          }) + "\n"
+        );
         return {
           type: "text_delta",
           provider: "anthropic",
@@ -115,7 +133,7 @@ export class AnthropicProvider extends Provider {
     }
 
     if (chunk.type === "content_block_start") {
-      if (chunk.content_block.type === "mcp_tool_use") {
+        if (chunk.content_block.type === "mcp_tool_use") {
         this.currentToolName = chunk.content_block.name;
         return {
           type: "tool_call_start",
@@ -176,12 +194,10 @@ export class AnthropicProvider extends Provider {
   ): Promise<void> {
     await super.processNormalizedChunk(normalizedChunk);
 
-    // Backward compatibility
     if (normalizedChunk.type === "text_delta") {
       const text = normalizedChunk.data.text;
       if (text) {
         this.content += text;
-        process.stdout.write(text);
       }
     } else if (normalizedChunk.type === "tool_call_start") {
       const toolName = normalizedChunk.data.toolName;

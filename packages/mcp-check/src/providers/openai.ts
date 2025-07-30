@@ -11,6 +11,7 @@ export class OpenAIProvider extends Provider {
   private client: OpenAI | null;
   private usedTools: string[] = [];
   private toolCalls: Record<string, any[]> = {};
+  private currentModel: string = "";
 
   constructor(
     mcpServer: McpServer,
@@ -31,6 +32,7 @@ export class OpenAIProvider extends Provider {
 
     this.usedTools = [];
     this.toolCalls = {};
+    this.currentModel = model;
 
     const response = await this.client.responses.create({
       model: model as ChatModel,
@@ -51,13 +53,12 @@ export class OpenAIProvider extends Provider {
 
     let content = "";
 
-    // Log stream start
     process.stdout.write(
       JSON.stringify({
         type: "model_stream",
         model: model,
-        text: `Starting ${model} execution...`,
-      }),
+        text: `Starting ${model} execution...\n`,
+      }) + "\n",
     );
 
     for await (const chunk of response) {
@@ -118,6 +119,14 @@ export class OpenAIProvider extends Provider {
       if (toolName) {
         this.usedTools.push(toolName);
 
+        process.stdout.write(
+          JSON.stringify({
+            type: "model_stream",
+            model: this.currentModel,
+            text: `Calling tool: ${toolName}\n`,
+          }) + "\n"
+        );
+
         if (!this.toolCalls[toolName]) {
           this.toolCalls[toolName] = [];
         }
@@ -138,6 +147,14 @@ export class OpenAIProvider extends Provider {
           this.toolCalls[toolName][this.toolCalls[toolName].length - 1];
         if (lastCall) {
           lastCall.result = { id: `result_${Date.now()}`, status: "completed" };
+
+          process.stdout.write(
+            JSON.stringify({
+              type: "model_stream",
+              model: this.currentModel,
+              text: `Tool ${toolName} completed\n`,
+            }) + "\n"
+          );
         }
       }
     }
