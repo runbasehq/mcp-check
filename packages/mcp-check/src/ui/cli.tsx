@@ -308,7 +308,6 @@ const TaskManager = () => {
   const [animationFrame, setAnimationFrame] = useState(0);
   const isInitialized = useRef(false);
 
-  // Animation timer
   useEffect(() => {
     const timer = setInterval(() => {
       setAnimationFrame((f) => f + 1);
@@ -316,7 +315,6 @@ const TaskManager = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Initialize tasks
   useEffect(() => {
     if (isInitialized.current) return;
     isInitialized.current = true;
@@ -356,6 +354,8 @@ const TaskManager = () => {
   useEffect(() => {
     if (tasks.length > 0 && selectedIndex >= tasks.length) {
       setSelectedIndex(Math.max(0, tasks.length - 1));
+    } else if (tasks.length === 0) {
+      setSelectedIndex(0);
     }
   }, [tasks.length, selectedIndex]);
 
@@ -438,7 +438,6 @@ const TaskManager = () => {
     );
   }
 
-  // Build right panel content
   const rightLines: string[] = [];
   rightLines.push(
     `${currentTask?.name || "No task"} - ${currentTask?.status || "Loading..."}`,
@@ -490,7 +489,7 @@ const TaskManager = () => {
       {/* Body - Fixed number of rows */}
       {Array.from({ length: TERMINAL_HEIGHT - 1 }).map((_, lineIndex) => {
         const task = lineIndex < tasks.length ? tasks[lineIndex] : null;
-        const isSelected = lineIndex === selectedIndex && task !== null;
+        const isSelected = lineIndex === selectedIndex && task !== null && lineIndex < tasks.length;
 
         let leftContent = "";
         let leftColor = "white";
