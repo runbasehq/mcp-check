@@ -7,56 +7,39 @@ const mcpServer = new McpServer({
   type: "url",
 });
 
-// describe("update block tool", function () {
-//   test("should use update block tools", async function () {
-//     const agent = await client(mcpServer, [
-//       "claude-3-haiku-20240307",
-//       // "claude-3-5-haiku-latest",
-//     ])
-//       .prompt("Change the hero title to testing update block on Basehub.")
-//       .execute();
-
-//     expect(agent.usedTools).toHaveProperty("claude-3-haiku-20240307");
-//     expect(agent.usedTools["claude-3-haiku-20240307"]!).toEqual(
-//       expect.arrayContaining([
-//         "query_content",
-//         "get_content_structure",
-//         "update_blocks",
-//       ]),
-//     );
-
-//     const queryCalls =
-//       agent.toolCalls?.["claude-3-haiku-20240307"]?.["query_content"] ?? [];
-//     expect(queryCalls.length).toBe(1);
-
-//     const updateBlocks =
-//       agent.toolCalls?.["claude-3-haiku-20240307"]?.["update_blocks"] ?? [];
-//     const firstResult = updateBlocks[0]?.result;
-//     expect(typeof firstResult?.id).toBe("string");
-//   }, 120000);
-// });
-
 describe("get branches tool", function () {
   test("should retrieve available branches from Basehub", async function () {
-    const agent = await client(mcpServer, [
-      "claude-3-haiku-20240307",
-      "claude-3-5-haiku-20241022",
-    ])
+    const result = await client(mcpServer, ["claude-3-haiku-20240307", "claude-3-5-haiku-20241022"])
       .prompt("What branches are available in this Basehub repo?")
       .execute();
 
-    expect(agent.usedTools).toHaveProperty("claude-3-5-haiku-20241022");
-    expect(agent.usedTools["claude-3-5-haiku-20241022"]!).toEqual(
-      expect.arrayContaining(["list_branches"]),
-    );
+    expect(result.hasUsedTool("claude-3-5-haiku-20241022", "list_branches")).toBe(true);
+    expect(result.getUsedTools("claude-3-5-haiku-20241022")).toEqual(expect.arrayContaining(["list_branches"]));
 
-    const getBranchesCalls =
-      agent.toolCalls?.["claude-3-5-haiku-20241022"]?.["list_branches"] ?? [];
+    expect(result.getToolCallCount("claude-3-5-haiku-20241022", "list_branches")).toBeGreaterThan(0);
 
-    expect(getBranchesCalls.length).toBeGreaterThan(0);
+    const response = result.getResponse("claude-3-5-haiku-20241022");
+    expect(response).toBeDefined();
+    expect(response?.content).toBeDefined();
+    expect(response?.metadata?.duration).toBeGreaterThan(0);
 
-    // const result = getBranchesCalls[0]?.result;
-    // expect(Array.isArray(result)).toBe(true);
-    // expect(typeof result[0]?.name).toBe("string");
+    const executionResult = result.getExecutionResult();
+    expect(executionResult.summary.totalModels).toBe(2);
+    expect(executionResult.summary.successfulExecutions).toBeGreaterThan(0);
+    expect(executionResult.summary.executionTime).toBeGreaterThan(0);
+
+    expect(executionResult.responses["claude-3-haiku-20240307"]).toBeDefined();
+    expect(executionResult.responses["claude-3-5-haiku-20241022"]).toBeDefined();
+
+    expect(result.getResponse("claude-3-5-haiku-20241022")).toBeDefined();
+    expect(result.getAgentNames()).toContain("claude-3-haiku-20240307");
+    expect(result.getAgentNames()).toContain("claude-3-5-haiku-20241022");
+    expect(result.getSuccessfulAgents()).toHaveLength(2);
+    expect(result.getFailedAgents()).toHaveLength(0);
+
+    const allAgents = result.getAllResponses();
+    expect(Object.keys(allAgents)).toHaveLength(2);
+    expect(allAgents["claude-3-haiku-20240307"]).toBeDefined();
+    expect(allAgents["claude-3-5-haiku-20241022"]).toBeDefined();
   }, 120000);
 });

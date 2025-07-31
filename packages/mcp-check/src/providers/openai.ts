@@ -53,13 +53,15 @@ export class OpenAIProvider extends Provider {
 
     let content = "";
 
-    process.stdout.write(
-      JSON.stringify({
-        type: "model_stream",
-        model: model,
-        text: `Starting ${model} execution...\n`,
-      }) + "\n",
-    );
+    if (!this.config.silent) {
+      process.stdout.write(
+        JSON.stringify({
+          type: "model_stream",
+          model: model,
+          text: `Starting ${model} execution...\n`,
+        }) + "\n",
+      );
+    }
 
     for await (const chunk of response) {
       if (chunk.type === "response.output_item.added") {
@@ -147,13 +149,15 @@ export class OpenAIProvider extends Provider {
       if (toolName) {
         this.usedTools.push(toolName);
 
-        process.stdout.write(
-          JSON.stringify({
-            type: "model_stream",
-            model: this.currentModel,
-            text: `Calling tool: ${toolName}\n`,
-          }) + "\n"
-        );
+        if (!this.config.silent) {
+          process.stdout.write(
+            JSON.stringify({
+              type: "model_stream",
+              model: this.currentModel,
+              text: `Calling tool: ${toolName}\n`,
+            }) + "\n"
+          );
+        }
 
         if (!this.toolCalls[toolName]) {
           this.toolCalls[toolName] = [];
@@ -176,13 +180,15 @@ export class OpenAIProvider extends Provider {
         if (lastCall) {
           lastCall.result = { id: `result_${Date.now()}`, status: "completed" };
 
-          process.stdout.write(
-            JSON.stringify({
-              type: "model_stream",
-              model: this.currentModel,
-              text: `Tool ${toolName} completed\n`,
-            }) + "\n"
-          );
+          if (!this.config.silent) {
+            process.stdout.write(
+              JSON.stringify({
+                type: "model_stream",
+                model: this.currentModel,
+                text: `Tool ${toolName} completed\n`,
+              }) + "\n"
+            );
+          }
         }
       }
     }
