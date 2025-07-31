@@ -9,21 +9,16 @@ const mcpServer = new McpServer({
 
 describe("get branches tool", function () {
   test("should retrieve available branches from Basehub", async function () {
-    const result = await client(mcpServer, [
-      "claude-3-haiku-20240307",
-      "claude-3-5-haiku-20241022",
-    ])
+    const result = await client(mcpServer, ["claude-3-haiku-20240307", "claude-3-5-haiku-20241022"])
       .prompt("What branches are available in this Basehub repo?")
       .execute();
 
     expect(result.hasUsedTool("claude-3-5-haiku-20241022", "list_branches")).toBe(true);
-    expect(result.getUsedTools("claude-3-5-haiku-20241022")).toEqual(
-      expect.arrayContaining(["list_branches"]),
-    );
+    expect(result.getUsedTools("claude-3-5-haiku-20241022")).toEqual(expect.arrayContaining(["list_branches"]));
 
     expect(result.getToolCallCount("claude-3-5-haiku-20241022", "list_branches")).toBeGreaterThan(0);
 
-                const response = result.getResponse("claude-3-5-haiku-20241022");
+    const response = result.getResponse("claude-3-5-haiku-20241022");
     expect(response).toBeDefined();
     expect(response?.content).toBeDefined();
     expect(response?.metadata?.duration).toBeGreaterThan(0);
@@ -36,13 +31,13 @@ describe("get branches tool", function () {
     expect(executionResult.responses["claude-3-haiku-20240307"]).toBeDefined();
     expect(executionResult.responses["claude-3-5-haiku-20241022"]).toBeDefined();
 
-                expect(result.getResponse("claude-3-5-haiku-20241022")).toBeDefined();
+    expect(result.getResponse("claude-3-5-haiku-20241022")).toBeDefined();
     expect(result.getAgentNames()).toContain("claude-3-haiku-20240307");
     expect(result.getAgentNames()).toContain("claude-3-5-haiku-20241022");
     expect(result.getSuccessfulAgents()).toHaveLength(2);
     expect(result.getFailedAgents()).toHaveLength(0);
 
-                const allAgents = result.getAllResponses();
+    const allAgents = result.getAllResponses();
     expect(Object.keys(allAgents)).toHaveLength(2);
     expect(allAgents["claude-3-haiku-20240307"]).toBeDefined();
     expect(allAgents["claude-3-5-haiku-20241022"]).toBeDefined();

@@ -6,6 +6,7 @@ export type {
   ChunkCallback,
   ChunkTypeCallback,
   ToolCall,
+  StreamResult,
   AgentResponse,
   AgentsExecutionResult,
   TypedToolCall,

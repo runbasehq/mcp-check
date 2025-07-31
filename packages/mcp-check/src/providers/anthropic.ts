@@ -57,13 +57,15 @@ export class AnthropicProvider extends Provider {
       betas: ["mcp-client-2025-04-04"],
     });
 
-    process.stdout.write(
-      JSON.stringify({
-        type: "model_stream",
-        model: model,
-        text: `Starting ${model} execution...\n`,
-      }) + "\n",
-    );
+    if (!this.config.silent) {
+      process.stdout.write(
+        JSON.stringify({
+          type: "model_stream",
+          model: model,
+          text: `Starting ${model} execution...\n`,
+        }) + "\n",
+      );
+    }
 
 
     for await (const chunk of stream) {
@@ -124,13 +126,15 @@ export class AnthropicProvider extends Provider {
 
     if (chunk.type === "content_block_delta") {
       if (chunk.delta.type === "text_delta") {
-        process.stdout.write(
-          JSON.stringify({
-            type: "model_stream",
-            model: this.currentModel,
-            text: chunk.delta.text,
-          }) + "\n"
-        );
+        if (!this.config.silent) {
+          process.stdout.write(
+            JSON.stringify({
+              type: "model_stream",
+              model: this.currentModel,
+              text: chunk.delta.text,
+            }) + "\n"
+          );
+        }
         return {
           type: "text_delta",
           provider: "anthropic",

@@ -3,6 +3,12 @@ export interface ToolCall {
   result?: any;
 }
 
+export interface StreamResult {
+  content: string;
+  usedTools: string[];
+  toolCalls: Record<string, ToolCall[]>;
+}
+
 export interface AgentResponse {
   model: string;
   content: string;
