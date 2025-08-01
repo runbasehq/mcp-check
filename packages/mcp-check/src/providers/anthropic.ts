@@ -212,18 +212,6 @@ export class AnthropicProvider extends Provider {
   protected normalizeChunk(chunk: any): NormalizedChunk | null {
     const timestamp = Date.now();
 
-<<<<<<< HEAD
-    // Handle content block delta (text streaming)
-    if (chunk.type === "content_block_delta" && chunk.delta?.type === "text_delta") {
-      if (!this.config.silent) {
-        process.stdout.write(
-          JSON.stringify({
-            type: "model_stream",
-            model: this.currentModel,
-            text: chunk.delta.text,
-          }) + "\n"
-        );
-=======
     if (chunk.type === "content_block_delta") {
       if (chunk.delta.type === "text_delta") {
         if (!this.config.silent) {
@@ -250,15 +238,7 @@ export class AnthropicProvider extends Provider {
           data: { thinking: chunk.delta.thinking },
           originalChunk: chunk,
         };
->>>>>>> origin/dev
       }
-      return {
-        type: "text_delta",
-        provider: "anthropic",
-        timestamp,
-        data: { text: chunk.delta.text },
-        originalChunk: chunk,
-      };
     }
 
     // Handle content block start (tool call start)

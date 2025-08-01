@@ -122,22 +122,15 @@ export class OpenAIProvider extends Provider {
       stream: true,
     });
 
-<<<<<<< HEAD
-=======
     let content = "";
 
->>>>>>> origin/dev
     if (!this.config.silent) {
       process.stdout.write(
         JSON.stringify({
           type: "model_stream",
           model: model,
           text: `Starting ${model} execution...\n`,
-<<<<<<< HEAD
-        }) + "\n"
-=======
         }) + "\n",
->>>>>>> origin/dev
       );
     }
 
@@ -281,31 +274,6 @@ export class OpenAIProvider extends Provider {
     return null;
   }
 
-<<<<<<< HEAD
-  /**
-   * Processes a normalized chunk with provider-specific handling.
-   * 
-   * This method extends the base chunk processing to include OpenAI-specific
-   * chunk handling before delegating to the parent class.
-   * 
-   * @param normalizedChunk - The normalized chunk to process
-   * @returns Promise that resolves when processing is complete
-   * 
-   * @example
-   * ```typescript
-   * const normalized = this.normalizeChunk(rawChunk);
-   * if (normalized) {
-   *   await this.processNormalizedChunk(normalized);
-   * }
-   * ```
-   */
-  protected async processNormalizedChunk(normalizedChunk: NormalizedChunk): Promise<void> {
-    // Handle OpenAI-specific chunk types
-    if (normalizedChunk.originalChunk?.type === "response.output_item.added") {
-      const handlers = this.getChunkHandlers();
-      if (handlers.openai?.onResponseOutputItemAdded) {
-        await handlers.openai.onResponseOutputItemAdded(normalizedChunk.originalChunk);
-=======
   protected async processNormalizedChunk(
     normalizedChunk: NormalizedChunk,
   ): Promise<void> {
@@ -358,7 +326,14 @@ export class OpenAIProvider extends Provider {
             );
           }
         }
->>>>>>> origin/dev
+      }
+    }
+
+    // Handle OpenAI-specific chunk types
+    if (normalizedChunk.originalChunk?.type === "response.output_item.added") {
+      const handlers = this.getChunkHandlers();
+      if (handlers.openai?.onResponseOutputItemAdded) {
+        await handlers.openai.onResponseOutputItemAdded(normalizedChunk.originalChunk);
       }
     }
 

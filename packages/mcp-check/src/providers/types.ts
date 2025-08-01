@@ -26,12 +26,8 @@ export interface ProviderConfig {
   openaiApiKey?: string;
   /** Configuration for handling streaming chunks */
   chunkHandlers?: ChunkHandlerConfig;
-<<<<<<< HEAD
   /** Whether to suppress console output during execution */
   silent?: boolean;
   /** Additional configuration properties */
-=======
-  silent?: boolean;
->>>>>>> origin/dev
   [key: string]: any;
 }

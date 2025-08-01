@@ -1,12 +1,7 @@
 import type { ModelName } from "./providers";
 import type { ProviderConfig } from "./providers/types";
-<<<<<<< HEAD
-import { McpServer } from "./server";
-import { AgentsClient } from "./agents";
-=======
-import type { ModelName, Models } from "./providers";
 import type { AgentResponse, AgentsExecutionResult, ToolCallStats } from "./chunks/types";
->>>>>>> origin/dev
+import { createProvider } from "./providers";
 
 export type { ModelName, Models } from "./providers";
 
@@ -21,10 +16,6 @@ export {
   type AgentsExecutionResult,
   type ToolCallStats,
 } from "./chunks";
-
-<<<<<<< HEAD
-export { McpServer } from "./server";
-export { AgentsClient, AgentsResult } from "./agents";
 
 /**
  * Creates a new AgentsClient instance for executing prompts against MCP servers.
@@ -47,9 +38,6 @@ export { AgentsClient, AgentsResult } from "./agents";
  *   .execute();
  * ```
  */
-export function client<T extends ModelName>(mcpServer: McpServer, models: T[], config: ProviderConfig = {}): AgentsClient<T> {
-  return new AgentsClient(mcpServer, models, config);
-=======
 export function client<T extends ModelName>(mcpServer: McpServer, models: T[], config: ProviderConfig = {}): AgentsClient<T> {
   return new AgentsClient(mcpServer, models, config);
 }
@@ -167,8 +155,6 @@ export class AgentsResult<T extends ModelName = ModelName> {
     return this.responses[model]?.toolCalls[tool]?.length || 0;
   }
 
-
-
   getAgentNames(): T[] {
     return this.models;
   }
@@ -180,8 +166,6 @@ export class AgentsResult<T extends ModelName = ModelName> {
   getFailedAgents(): T[] {
     return this.models.filter((model) => !this.responses[model]);
   }
-
-
 }
 
 export class AgentsClient<T extends ModelName = ModelName> {
@@ -249,5 +233,4 @@ export class AgentsClient<T extends ModelName = ModelName> {
 
     return new AgentsResult(responsesMap, executionStartTime, executionEndTime, this.models, this);
   }
->>>>>>> origin/dev
 }
