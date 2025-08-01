@@ -1,7 +1,7 @@
-import { createProvider } from "./providers";
+import type { ModelName } from "./providers";
 import type { ProviderConfig } from "./providers/types";
-import type { ModelName, Models } from "./providers";
 import type { AgentResponse, AgentsExecutionResult, ToolCallStats } from "./chunks/types";
+import { createProvider } from "./providers";
 
 export type { ModelName, Models } from "./providers";
 
@@ -17,6 +17,27 @@ export {
   type ToolCallStats,
 } from "./chunks";
 
+/**
+ * Creates a new AgentsClient instance for executing prompts against MCP servers.
+ * 
+ * @template T - The type of model names to use
+ * @param mcpServer - The MCP server configuration
+ * @param models - Array of model names to execute
+ * @param config - Optional provider configuration (API keys, silent mode, etc.)
+ * @returns A configured AgentsClient instance
+ * 
+ * @example
+ * ```typescript
+ * const client = client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"], {
+ *   silent: true,
+ *   anthropicApiKey: process.env.ANTHROPIC_API_KEY
+ * });
+ * 
+ * const result = await client
+ *   .prompt("What tools are available?")
+ *   .execute();
+ * ```
+ */
 export function client<T extends ModelName>(mcpServer: McpServer, models: T[], config: ProviderConfig = {}): AgentsClient<T> {
   return new AgentsClient(mcpServer, models, config);
 }
@@ -134,8 +155,6 @@ export class AgentsResult<T extends ModelName = ModelName> {
     return this.responses[model]?.toolCalls[tool]?.length || 0;
   }
 
-
-
   getAgentNames(): T[] {
     return this.models;
   }
@@ -147,8 +166,6 @@ export class AgentsResult<T extends ModelName = ModelName> {
   getFailedAgents(): T[] {
     return this.models.filter((model) => !this.responses[model]);
   }
-
-
 }
 
 export class AgentsClient<T extends ModelName = ModelName> {

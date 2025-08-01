@@ -10,7 +10,7 @@
   <a href="https://www.npmjs.com/package/mcp-check"><img alt="npm" src="https://img.shields.io/npm/v/mcp-check?style=flat-square" /></a>
 </p>
 
-A TypeScript library for testing MCP (Model Context Protocol) servers with AI models. This library allows you to execute prompts against MCP servers using various AI models (Claude, GPT) and verify tool usage and results.
+A TypeScript library for testing MCP (Model Context Protocol) servers with AI models. This library allows you to execute prompts against MCP servers using various AI models (Claude, GPT) and verify tool usage and results with comprehensive streaming support and chunk handling.
 
 ## Installation
 
@@ -33,14 +33,21 @@ const mcpServer = new McpServer({
   type: "url",
 });
 
-// Execute a prompt with AI models
-const agent = await client(mcpServer, ["claude-3-haiku-20240307"])
-  .prompt("Update the content using the available tools.")
+// Execute a prompt with multiple AI models
+const result = await client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"])
+  .prompt("What tools are available and how do they work?")
   .execute();
 
-// Check which tools were used
-console.log("Used tools:", agent.usedTools);
-console.log("Tool calls:", agent.toolCalls);
+// Get comprehensive results
+const executionResult = result.getExecutionResult();
+console.log("Execution time:", executionResult.summary.executionTime);
+console.log("Successful models:", result.getSuccessfulAgents());
+console.log("Common tools used:", executionResult.summary.commonTools);
+
+// Check specific model responses
+const claudeResponse = result.getResponse("claude-3-haiku-20240307");
+console.log("Claude content:", claudeResponse?.content);
+console.log("Tools used by Claude:", claudeResponse?.usedTools);
 ```
 
 ## API Reference
@@ -52,18 +59,27 @@ Configure your MCP server connection:
 ```typescript
 const mcpServer = new McpServer({
   url: string,              // MCP server URL
-  authorizationToken: string, // Authorization token  
+  authorizationToken?: string, // Optional authorization token  
   name: string,             // Server name
   type: string,             // Server type (e.g., "url")
 });
 ```
 
-### client(mcpServer, models)
+### client(mcpServer, models, config?)
 
 Create a client instance to execute prompts:
 
 ```typescript
-const agent = client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"])
+const result = await client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"], {
+  silent: true, // Suppress console output
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+  openaiApiKey: process.env.OPENAI_API_KEY,
+  chunkHandlers: {
+    onTextDelta: (data) => console.log("Text:", data.text),
+    onToolCallStart: (data) => console.log("Tool started:", data.toolName),
+    onError: (data) => console.error("Error:", data.error)
+  }
+})
   .prompt("Your prompt here")
   .execute();
 ```
@@ -71,6 +87,7 @@ const agent = client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"])
 **Parameters:**
 - `mcpServer`: Configured MCP server instance
 - `models`: Array of AI model names to use
+- `config?`: Optional configuration including API keys, silent mode, and chunk handlers
 
 **Supported Models:**
 - Claude models: `claude-3-haiku-20240307`, `claude-3-5-sonnet-20240620`, etc.
@@ -81,24 +98,62 @@ const agent = client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"])
 #### `.prompt(text: string)`
 Set the prompt to execute against the MCP server.
 
+#### `.allowTools(tools: string[])`
+Restrict which tools can be used by the models.
+
 #### `.execute()`
-Execute the prompt and return results with tool usage tracking.
+Execute the prompt and return comprehensive results with tool usage tracking.
 
-### Agent Properties
+### Result Methods
 
-After execution, the agent provides:
+The `execute()` method returns an `AgentsResult` object with these methods:
 
-#### `usedTools`
-Record of tools used by each model:
+#### `getResponse(model)`
+Get the response for a specific model:
 ```typescript
-agent.usedTools["claude-3-haiku-20240307"] // ["query_content", "update_blocks"]
+const response = result.getResponse("claude-3-haiku-20240307");
+console.log(response?.content, response?.usedTools);
 ```
 
-#### `toolCalls` 
-Detailed tool call information including arguments and results:
+#### `getAllResponses()`
+Get all model responses as a record.
+
+#### `getExecutionResult()`
+Get comprehensive execution statistics:
 ```typescript
-agent.toolCalls["claude-3-haiku-20240307"]["update_blocks"][0].result
+const execution = result.getExecutionResult();
+console.log("Total models:", execution.summary.totalModels);
+console.log("Successful:", execution.summary.successfulExecutions);
+console.log("Common tools:", execution.summary.commonTools);
+console.log("Execution time:", execution.summary.executionTime);
 ```
+
+#### `getToolStats()`
+Get detailed tool usage statistics:
+```typescript
+const stats = result.getToolStats();
+stats.forEach(stat => {
+  console.log(`${stat.toolName}: ${stat.callCount} calls`);
+});
+```
+
+#### `getContent(model)`
+Get the content from a specific model.
+
+#### `getUsedTools(model)`
+Get tools used by a specific model.
+
+#### `hasUsedTool(model, tool)`
+Check if a model used a specific tool.
+
+#### `getToolCallCount(model, tool)`
+Get the number of times a tool was called by a model.
+
+#### `getSuccessfulAgents()`
+Get list of models that executed successfully.
+
+#### `getFailedAgents()`
+Get list of models that failed to execute.
 
 ## Testing Example
 
@@ -113,30 +168,35 @@ const mcpServer = new McpServer({
 });
 
 describe("MCP Server Tests", () => {
-  test("should use expected tools", async () => {
-    const agent = await client(mcpServer, ["claude-3-haiku-20240307"])
+  test("should use expected tools across multiple models", async () => {
+    const result = await client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"])
       .prompt("Update the content using the available tools.")
       .execute();
 
-    // Verify tools were used
-    expect(agent.usedTools).toHaveProperty("claude-3-haiku-20240307");
-    expect(agent.usedTools["claude-3-haiku-20240307"]!).toEqual(
-      expect.arrayContaining([
-        "query_content",
-        "get_content_structure", 
-        "update_blocks",
-      ]),
+    // Verify execution summary
+    const execution = result.getExecutionResult();
+    expect(execution.summary.totalModels).toBe(2);
+    expect(execution.summary.successfulExecutions).toBe(2);
+    expect(execution.summary.commonTools).toContain("query_content");
+
+    // Verify specific model responses
+    const claudeResponse = result.getResponse("claude-3-haiku-20240307");
+    expect(claudeResponse?.usedTools).toEqual(
+      expect.arrayContaining(["query_content", "update_blocks"])
     );
 
-    // Verify tool calls
-    const queryCalls = 
-      agent.toolCalls?.["claude-3-haiku-20240307"]?.["query_content"] ?? [];
-    expect(queryCalls.length).toBeGreaterThan(0);
+    const gptResponse = result.getResponse("gpt-4");
+    expect(gptResponse?.usedTools).toEqual(
+      expect.arrayContaining(["query_content", "update_blocks"])
+    );
 
-    const updateBlocks =
-      agent.toolCalls?.["claude-3-haiku-20240307"]?.["update_blocks"] ?? [];
-    expect(updateBlocks.length).toBeGreaterThan(0);
-    expect(updateBlocks[0]?.result).toBeDefined();
+    // Verify tool call details
+    expect(result.hasUsedTool("claude-3-haiku-20240307", "query_content")).toBe(true);
+    expect(result.getToolCallCount("claude-3-haiku-20240307", "update_blocks")).toBeGreaterThan(0);
+
+    // Verify successful agents
+    expect(result.getSuccessfulAgents()).toContain("claude-3-haiku-20240307");
+    expect(result.getSuccessfulAgents()).toContain("gpt-4");
   }, 90000);
 });
 ```
