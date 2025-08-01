@@ -1,11 +1,14 @@
 export { ChunkNormalizer } from "./normalizer.js";
-
 export type {
-  ToolCall,
-  StreamResult,
   NormalizedChunk,
   NormalizedChunkType,
   ChunkHandlerConfig,
   ChunkCallback,
   ChunkTypeCallback,
+  ToolCall,
+  StreamResult,
+  AgentResponse,
+  AgentsExecutionResult,
+  TypedToolCall,
+  ToolCallStats,
 } from "./types.js";
