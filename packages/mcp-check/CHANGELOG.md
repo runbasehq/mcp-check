@@ -1,5 +1,12 @@
 # mcp-testing-library
 
+## 0.3.0
+
+### Minor Changes
+
+- 990df81: - Add comprehensive JSDoc documentation and improve code organization
+  - Improve AgentsResult API with Better Typing and Cleaner Method Names
+
 ## 0.2.3
 
 ### Patch Changes
