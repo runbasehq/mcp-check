@@ -1,7 +1,7 @@
 {
   "name": "mcp-check",
   "module": "index.ts",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -35,7 +35,7 @@
     }
   },
   "bin": {
-    "mcp-check": "./bin/mcp-check"
+    "mcp-check": "./bin/mcp-check.js"
   },
   "scripts": {
     "build": "tsup",

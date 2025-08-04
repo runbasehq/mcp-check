@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.3.1
+
+### Patch Changes
+
+- fix bin script
+
 ## 0.3.0
 
 ### Minor Changes
