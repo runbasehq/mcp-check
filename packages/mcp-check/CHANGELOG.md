@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.3.2
+
+### Patch Changes
+
+- main, module, types now point to dist/src/
+
 ## 0.3.1
 
 ### Patch Changes
