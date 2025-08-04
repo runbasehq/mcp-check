@@ -1,7 +1,7 @@
 {
   "name": "mcp-check",
   "module": "dist/src/index.js",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -19,6 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",
     "@modelcontextprotocol/sdk": "^1.16.0",
+    "dotenv": "^16.6.1",
     "glob": "^11.0.0",
     "ink": "^6.1.0",
     "openai": "^5.10.1",

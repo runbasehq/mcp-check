@@ -1,7 +1,14 @@
+import { config } from "dotenv";
 import type { ModelName } from "./providers";
 import type { ProviderConfig } from "./providers/types";
-import type { AgentResponse, AgentsExecutionResult, ToolCallStats } from "./chunks/types";
+import type {
+  AgentResponse,
+  AgentsExecutionResult,
+  ToolCallStats,
+} from "./chunks/types";
 import { createProvider } from "./providers";
+
+config();
 
 export type { ModelName, Models } from "./providers";
 
@@ -19,26 +26,30 @@ export {
 
 /**
  * Creates a new AgentsClient instance for executing prompts against MCP servers.
- * 
+ *
  * @template T - The type of model names to use
  * @param mcpServer - The MCP server configuration
  * @param models - Array of model names to execute
  * @param config - Optional provider configuration (API keys, silent mode, etc.)
  * @returns A configured AgentsClient instance
- * 
+ *
  * @example
  * ```typescript
  * const client = client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"], {
  *   silent: true,
  *   anthropicApiKey: process.env.ANTHROPIC_API_KEY
  * });
- * 
+ *
  * const result = await client
  *   .prompt("What tools are available?")
  *   .execute();
  * ```
  */
-export function client<T extends ModelName>(mcpServer: McpServer, models: T[], config: ProviderConfig = {}): AgentsClient<T> {
+export function client<T extends ModelName>(
+  mcpServer: McpServer,
+  models: T[],
+  config: ProviderConfig = {}
+): AgentsClient<T> {
   return new AgentsClient(mcpServer, models, config);
 }
 
@@ -48,7 +59,17 @@ export class McpServer {
   public name: string;
   public type: string;
 
-  constructor({ url, authorizationToken, name, type }: { url: string; authorizationToken: string; name: string; type: string }) {
+  constructor({
+    url,
+    authorizationToken,
+    name,
+    type,
+  }: {
+    url: string;
+    authorizationToken: string;
+    name: string;
+    type: string;
+  }) {
     this.url = url;
     this.authorizationToken = authorizationToken;
     this.name = name;
@@ -89,7 +110,9 @@ export class AgentsResult<T extends ModelName = ModelName> {
     const successfulExecutions = Object.keys(this.responses).length;
     const failedExecutions = this.models.length - successfulExecutions;
 
-    const allTools = (Object.values(this.responses) as AgentResponse[]).flatMap((r) => r.usedTools);
+    const allTools = (Object.values(this.responses) as AgentResponse[]).flatMap(
+      (r) => r.usedTools
+    );
     const toolCounts = allTools.reduce(
       (acc, tool) => {
         acc[tool] = (acc[tool] || 0) + 1;
@@ -129,13 +152,18 @@ export class AgentsResult<T extends ModelName = ModelName> {
         }
 
         stats[toolName].callCount += (calls as any[]).length;
-        stats[toolName].lastCalled = Math.max(stats[toolName].lastCalled || 0, response.metadata?.timestamp || 0);
+        stats[toolName].lastCalled = Math.max(
+          stats[toolName].lastCalled || 0,
+          response.metadata?.timestamp || 0
+        );
       });
     });
 
     return Object.values(stats).map((stat) => ({
       ...stat,
-      averageDuration: stat.totalDuration ? stat.totalDuration / stat.callCount : undefined,
+      averageDuration: stat.totalDuration
+        ? stat.totalDuration / stat.callCount
+        : undefined,
     }));
   }
 
@@ -202,7 +230,12 @@ export class AgentsClient<T extends ModelName = ModelName> {
     const executionStartTime = Date.now();
 
     this.executionPromises = this.models.map(async (model) => {
-      const provider = createProvider(model, this.mcpServer!, this.promptText, this.config);
+      const provider = createProvider(
+        model,
+        this.mcpServer!,
+        this.promptText,
+        this.config
+      );
       const result = await provider.stream(model);
 
       this.usedTools[model] = result.usedTools;
@@ -231,6 +264,12 @@ export class AgentsClient<T extends ModelName = ModelName> {
       {} as Record<T, AgentResponse>
     );
 
-    return new AgentsResult(responsesMap, executionStartTime, executionEndTime, this.models, this);
+    return new AgentsResult(
+      responsesMap,
+      executionStartTime,
+      executionEndTime,
+      this.models,
+      this
+    );
   }
 }
