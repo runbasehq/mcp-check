@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.3.3
+
+### Patch Changes
+
+- fix: add automatic .env file loading for API keys
+
 ## 0.3.2
 
 ### Patch Changes
