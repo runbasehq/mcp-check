@@ -64,22 +64,6 @@ importers:
         specifier: ^8.36.0
         version: 8.38.0(eslint@9.32.0)(typescript@5.8.3)
 
-  packages/jest-playground:
-    dependencies:
-      '@types/jest':
-        specifier: ^30.0.0
-        version: 30.0.0
-      jest:
-        specifier: ^30.0.5
-        version: 30.0.5(@types/node@24.1.0)(ts-node@10.9.2(@types/node@24.1.0)(typescript@5.8.3))
-      typescript:
-        specifier: ^5.0.0
-        version: 5.8.3
-    devDependencies:
-      '@types/bun':
-        specifier: latest
-        version: 1.2.19(@types/react@19.1.8)
-
   packages/mcp-check:
     dependencies:
       '@anthropic-ai/sdk':
