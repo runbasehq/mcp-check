@@ -1,4 +1,5 @@
 # mcp-check
+⚠️ It's not usable yet, but docs and a stable release are coming in the next few weeks. Stay tuned.
 
 <p align="center">
   <a href="https://x.com/fveiras_">
