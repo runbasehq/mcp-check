@@ -44,9 +44,7 @@ export {
  *   name: "contains id",
  *   tool: "list_branches",
  *   scorer: ({ output }) => {
- *     try {
- *       return output.some((b: { id: string }) => b.id) ? 1 : 0;
- *     } catch { return 0; }
+ *     return output.includes("id") ? 1 : 0;
  *   },
  * }]);
  *
