@@ -46,31 +46,29 @@ describe("get branches tool", function () {
 
     const response = result.getResponse("claude-3-5-haiku-20241022");
 
-    console.log("here", result.getScores("claude-3-5-haiku-20241022"));
+    expect(response).toBeDefined();
+    expect(response?.content).toBeDefined();
+    expect(response?.metadata?.duration).toBeGreaterThan(0);
 
-    // expect(response).toBeDefined();
-    // expect(response?.content).toBeDefined();
-    // expect(response?.metadata?.duration).toBeGreaterThan(0);
+    const executionResult = result.getExecutionResult();
+    expect(executionResult.summary.totalModels).toBe(2);
+    expect(executionResult.summary.successfulExecutions).toBeGreaterThan(0);
+    expect(executionResult.summary.executionTime).toBeGreaterThan(0);
 
-    // const executionResult = result.getExecutionResult();
-    // expect(executionResult.summary.totalModels).toBe(2);
-    // expect(executionResult.summary.successfulExecutions).toBeGreaterThan(0);
-    // expect(executionResult.summary.executionTime).toBeGreaterThan(0);
+    expect(executionResult.responses["claude-3-haiku-20240307"]).toBeDefined();
+    expect(
+      executionResult.responses["claude-3-5-haiku-20241022"],
+    ).toBeDefined();
 
-    // expect(executionResult.responses["claude-3-haiku-20240307"]).toBeDefined();
-    // expect(
-    //   executionResult.responses["claude-3-5-haiku-20241022"],
-    // ).toBeDefined();
+    expect(result.getResponse("claude-3-5-haiku-20241022")).toBeDefined();
+    expect(result.getAgentNames()).toContain("claude-3-haiku-20240307");
+    expect(result.getAgentNames()).toContain("claude-3-5-haiku-20241022");
+    expect(result.getSuccessfulAgents()).toHaveLength(2);
+    expect(result.getFailedAgents()).toHaveLength(0);
 
-    // expect(result.getResponse("claude-3-5-haiku-20241022")).toBeDefined();
-    // expect(result.getAgentNames()).toContain("claude-3-haiku-20240307");
-    // expect(result.getAgentNames()).toContain("claude-3-5-haiku-20241022");
-    // expect(result.getSuccessfulAgents()).toHaveLength(2);
-    // expect(result.getFailedAgents()).toHaveLength(0);
-
-    // const allAgents = result.getAllResponses();
-    // expect(Object.keys(allAgents)).toHaveLength(2);
-    // expect(allAgents["claude-3-haiku-20240307"]).toBeDefined();
-    // expect(allAgents["claude-3-5-haiku-20241022"]).toBeDefined();
+    const allAgents = result.getAllResponses();
+    expect(Object.keys(allAgents)).toHaveLength(2);
+    expect(allAgents["claude-3-haiku-20240307"]).toBeDefined();
+    expect(allAgents["claude-3-5-haiku-20241022"]).toBeDefined();
   }, 120000);
 });
