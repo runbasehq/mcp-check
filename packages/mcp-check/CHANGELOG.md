@@ -1,5 +1,14 @@
 # mcp-testing-library
 
+## 0.4.0
+
+### Minor Changes
+
+- - Add scoring system for tool call evaluation (getScores() and .scorers() methods)
+  - Simplified API: Removed .execute() calls since prompt() now auto-executes
+  - Scorer System: Added comprehensive section explaining how to use scorers
+  - Updated Examples
+
 ## 0.3.3
 
 ### Patch Changes

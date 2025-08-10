@@ -6,10 +6,10 @@ import type { ProviderConfig } from "./types.js";
 
 /**
  * Type alias for Anthropic model names.
- * 
+ *
  * This type represents all available Anthropic Claude model identifiers
  * that can be used with the AnthropicProvider.
- * 
+ *
  * @example
  * ```typescript
  * const model: AnthropicModel = "claude-3-haiku-20240307";
@@ -19,18 +19,18 @@ export type AnthropicModel = Anthropic.Model;
 
 /**
  * Provider for Anthropic Claude models.
- * 
+ *
  * This class handles interactions with Anthropic's Claude models through
  * their official SDK. It supports streaming responses, MCP tool calls,
  * and chunk normalization for the Anthropic API format.
- * 
+ *
  * @example
  * ```typescript
  * const provider = new AnthropicProvider(mcpServer, "What tools are available?", {
  *   anthropicApiKey: process.env.ANTHROPIC_API_KEY,
  *   silent: true
  * });
- * 
+ *
  * const result = await provider.stream("claude-3-haiku-20240307");
  * console.log("Content:", result.content);
  * console.log("Used tools:", result.usedTools);
@@ -52,11 +52,11 @@ export class AnthropicProvider extends Provider {
 
   /**
    * Creates a new AnthropicProvider instance.
-   * 
+   *
    * @param mcpServer - The MCP server configuration
    * @param promptText - The prompt text to send to Claude
    * @param config - Optional provider configuration including API key
-   * 
+   *
    * @example
    * ```typescript
    * const provider = new AnthropicProvider(mcpServer, "Hello Claude!", {
@@ -80,16 +80,16 @@ export class AnthropicProvider extends Provider {
 
   /**
    * Streams a response from the specified Anthropic Claude model.
-   * 
+   *
    * This method establishes a streaming connection to the Anthropic API,
    * processes the response chunks, tracks tool usage, and returns the
    * final result with content and tool call information.
-   * 
+   *
    * @param model - The Anthropic model name to use (e.g., "claude-3-haiku-20240307")
    * @returns Promise that resolves to a StreamResult containing the response
-   * 
+   *
    * @throws {Error} When the Anthropic client is not initialized (missing API key)
-   * 
+   *
    * @example
    * ```typescript
    * const result = await provider.stream("claude-3-sonnet-20240229");
@@ -141,7 +141,6 @@ export class AnthropicProvider extends Provider {
       );
     }
 
-
     for await (const chunk of stream) {
       if (
         chunk.type === "content_block_start" &&
@@ -149,17 +148,17 @@ export class AnthropicProvider extends Provider {
       ) {
         const toolName = chunk.content_block.name;
         this.usedTools.push(toolName);
-        
+
         if (!this.toolCalls[toolName]) {
           this.toolCalls[toolName] = [];
         }
-        
+
         this.toolCalls[toolName].push({
           args: chunk.content_block.input || {},
-          result: null
+          result: null,
         });
       }
-      
+
       await this.processChunk(chunk);
     }
 
@@ -193,13 +192,13 @@ export class AnthropicProvider extends Provider {
 
   /**
    * Normalizes Anthropic-specific chunks into the unified NormalizedChunk format.
-   * 
+   *
    * This method converts Anthropic's streaming response chunks into a standardized
    * format that can be processed by the chunk handling system.
-   * 
+   *
    * @param chunk - The raw chunk from Anthropic's streaming API
    * @returns NormalizedChunk if the chunk can be normalized, null otherwise
-   * 
+   *
    * @example
    * ```typescript
    * const normalized = this.normalizeChunk(anthropicChunk);
@@ -220,7 +219,7 @@ export class AnthropicProvider extends Provider {
               type: "model_stream",
               model: this.currentModel,
               text: chunk.delta.text,
-            }) + "\n"
+            }) + "\n",
           );
         }
         return {
@@ -242,7 +241,10 @@ export class AnthropicProvider extends Provider {
     }
 
     // Handle content block start (tool call start)
-    if (chunk.type === "content_block_start" && chunk.content_block?.type === "mcp_tool_use") {
+    if (
+      chunk.type === "content_block_start" &&
+      chunk.content_block?.type === "mcp_tool_use"
+    ) {
       this.currentToolName = chunk.content_block.name;
       if (!this.config.silent) {
         process.stdout.write(
@@ -250,7 +252,7 @@ export class AnthropicProvider extends Provider {
             type: "model_stream",
             model: this.currentModel,
             text: `Calling tool: ${chunk.content_block.name}\n`,
-          }) + "\n"
+          }) + "\n",
         );
       }
       return {
@@ -266,14 +268,17 @@ export class AnthropicProvider extends Provider {
     }
 
     // Handle content block stop (tool call done)
-    if (chunk.type === "content_block_stop" && chunk.content_block?.type === "mcp_tool_use") {
+    if (
+      chunk.type === "content_block_stop" &&
+      chunk.content_block?.type === "mcp_tool_use"
+    ) {
       if (!this.config.silent) {
         process.stdout.write(
           JSON.stringify({
             type: "model_stream",
             model: this.currentModel,
             text: `Tool ${this.currentToolName} completed\n`,
-          }) + "\n"
+          }) + "\n",
         );
       }
       return {
@@ -306,7 +311,7 @@ export class AnthropicProvider extends Provider {
             type: "model_stream",
             model: this.currentModel,
             text: `Thinking: ${chunk.delta.thinking}\n`,
-          }) + "\n"
+          }) + "\n",
         );
       }
       return {
@@ -345,13 +350,13 @@ export class AnthropicProvider extends Provider {
 
   /**
    * Processes a normalized chunk with provider-specific handling.
-   * 
+   *
    * This method extends the base chunk processing to include Anthropic-specific
    * chunk handling before delegating to the parent class.
-   * 
+   *
    * @param normalizedChunk - The normalized chunk to process
    * @returns Promise that resolves when processing is complete
-   * 
+   *
    * @example
    * ```typescript
    * const normalized = this.normalizeChunk(rawChunk);
@@ -367,21 +372,27 @@ export class AnthropicProvider extends Provider {
     if (normalizedChunk.originalChunk?.type === "content_block_delta") {
       const handlers = this.getChunkHandlers();
       if (handlers.anthropic?.onContentBlockDelta) {
-        await handlers.anthropic.onContentBlockDelta(normalizedChunk.originalChunk);
+        await handlers.anthropic.onContentBlockDelta(
+          normalizedChunk.originalChunk,
+        );
       }
     }
 
     if (normalizedChunk.originalChunk?.type === "content_block_start") {
       const handlers = this.getChunkHandlers();
       if (handlers.anthropic?.onContentBlockStart) {
-        await handlers.anthropic.onContentBlockStart(normalizedChunk.originalChunk);
+        await handlers.anthropic.onContentBlockStart(
+          normalizedChunk.originalChunk,
+        );
       }
     }
 
     if (normalizedChunk.originalChunk?.type === "content_block_stop") {
       const handlers = this.getChunkHandlers();
       if (handlers.anthropic?.onContentBlockStop) {
-        await handlers.anthropic.onContentBlockStop(normalizedChunk.originalChunk);
+        await handlers.anthropic.onContentBlockStop(
+          normalizedChunk.originalChunk,
+        );
       }
     }
 
