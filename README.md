@@ -36,8 +36,7 @@ const mcpServer = new McpServer({
 
 // Execute a prompt with multiple AI models
 const result = await client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"])
-  .prompt("What tools are available and how do they work?")
-  .execute();
+  .prompt("What tools are available and how do they work?");
 
 // Get comprehensive results
 const executionResult = result.getExecutionResult();
@@ -66,7 +65,7 @@ const mcpServer = new McpServer({
 });
 ```
 
-### client(mcpServer, models, config?)
+### client(mcpServer, models, scorers?, config?)
 
 Create a client instance to execute prompts:
 
@@ -81,13 +80,27 @@ const result = await client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"], {
     onError: (data) => console.error("Error:", data.error)
   }
 })
-  .prompt("Your prompt here")
-  .execute();
+  .scorers([
+    {
+      name: "contains id",
+      tool: "list_branches",
+      scorer: ({ output }) => {
+        try {
+          const branches = JSON.parse(output[0]?.text);
+          return branches.some(branch => branch.id) ? 1 : 0;
+        } catch {
+          return 0;
+        }
+      }
+    }
+  ])
+  .prompt("Your prompt here");
 ```
 
 **Parameters:**
 - `mcpServer`: Configured MCP server instance
 - `models`: Array of AI model names to use
+- `scorers?`: Optional array of Scorer instances for tool evaluation
 - `config?`: Optional configuration including API keys, silent mode, and chunk handlers
 
 **Supported Models:**
@@ -97,17 +110,28 @@ const result = await client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"], {
 ### Agent Methods
 
 #### `.prompt(text: string)`
-Set the prompt to execute against the MCP server.
+Execute the prompt against the MCP server and return results. This method automatically executes the prompt.
+
+#### `.scorers(scorers: Array<{name: string; tool: string; scorer: Function}>)`
+Configure scorers to evaluate tool call results:
+```typescript
+.scorers([
+  {
+    name: "contains_data",
+    tool: "fetch_data", 
+    scorer: ({ output, input }) => {
+      return output?.data ? 1 : 0;
+    }
+  }
+])
+```
 
 #### `.allowTools(tools: string[])`
 Restrict which tools can be used by the models.
 
-#### `.execute()`
-Execute the prompt and return comprehensive results with tool usage tracking.
-
 ### Result Methods
 
-The `execute()` method returns an `AgentsResult` object with these methods:
+The `prompt()` method returns an `AgentsResult` object with these methods:
 
 #### `getResponse(model)`
 Get the response for a specific model:
@@ -156,6 +180,55 @@ Get list of models that executed successfully.
 #### `getFailedAgents()`
 Get list of models that failed to execute.
 
+#### `getScores(model)`
+Get evaluation scores for a specific model's tool calls:
+```typescript
+const scores = result.getScores("claude-3-haiku-20240307");
+scores.forEach(score => {
+  console.log(`${score.name}: ${score.score} for tool ${score.tool}`);
+});
+```
+
+## Scorer System
+
+The scorer system allows you to evaluate and validate tool call results automatically:
+
+```typescript
+const result = await client(mcpServer, ["claude-3-haiku-20240307"])
+  .scorers([
+    {
+      name: "valid_branches",
+      tool: "list_branches",
+      scorer: ({ output, input }) => {
+        try {
+          const branches = JSON.parse(output[0]?.text);
+          return branches.every(b => b.id && b.name) ? 1 : 0;
+        } catch {
+          return 0;
+        }
+      }
+    },
+    {
+      name: "has_results",
+      tool: "search_content", 
+      scorer: ({ output }) => {
+        return output?.results?.length > 0 ? 1 : 0;
+      }
+    }
+  ])
+  .prompt("List all branches and search for content");
+
+// Get scores for evaluation
+const scores = result.getScores("claude-3-haiku-20240307");
+console.log("Evaluation results:", scores);
+```
+
+Scorer functions receive:
+- `output`: The tool's result/response
+- `input`: The tool's input arguments
+
+Return a number (typically 0-1) representing the evaluation score.
+
 ## Testing Example
 
 ```typescript
@@ -171,8 +244,14 @@ const mcpServer = new McpServer({
 describe("MCP Server Tests", () => {
   test("should use expected tools across multiple models", async () => {
     const result = await client(mcpServer, ["claude-3-haiku-20240307", "gpt-4"])
-      .prompt("Update the content using the available tools.")
-      .execute();
+      .scorers([
+        {
+          name: "tool_success",
+          tool: "update_blocks",
+          scorer: ({ output }) => output?.success ? 1 : 0
+        }
+      ])
+      .prompt("Update the content using the available tools.");
 
     // Verify execution summary
     const execution = result.getExecutionResult();

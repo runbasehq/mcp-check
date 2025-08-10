@@ -7,10 +7,10 @@ export interface ToolCall {
 
 /**
  * Represents the result of a streaming operation.
- * 
+ *
  * Contains the final content generated and information about tools used
  * during the streaming process.
- * 
+ *
  * @example
  * ```typescript
  * const result: StreamResult = {
@@ -33,10 +33,10 @@ export interface StreamResult {
 
 /**
  * Represents a complete agent response with metadata.
- * 
+ *
  * This interface provides a comprehensive view of an AI agent's response,
  * including the model used, content generated, tools utilized, and metadata.
- * 
+ *
  * @example
  * ```typescript
  * const response: AgentResponse = {
@@ -76,10 +76,10 @@ export interface AgentResponse {
 
 /**
  * Represents the result of executing multiple agents.
- * 
+ *
  * This interface aggregates responses from multiple AI agents and provides
  * summary statistics about the execution.
- * 
+ *
  * @example
  * ```typescript
  * const executionResult: AgentsExecutionResult = {
@@ -117,25 +117,25 @@ export interface AgentsExecutionResult {
 
 /**
  * Typed tool call with generic arguments and result types.
- * 
+ *
  * This interface provides type safety for tool calls by allowing specification
  * of argument and result types through generics.
- * 
+ *
  * @template TArgs - Type of the tool arguments
  * @template TResult - Type of the tool result
- * 
+ *
  * @example
  * ```typescript
  * interface WeatherArgs {
  *   location: string;
  *   units: "celsius" | "fahrenheit";
  * }
- * 
+ *
  * interface WeatherResult {
  *   temperature: number;
  *   condition: string;
  * }
- * 
+ *
  * const typedCall: TypedToolCall<WeatherArgs, WeatherResult> = {
  *   args: { location: "NYC", units: "fahrenheit" },
  *   result: { temperature: 72, condition: "sunny" },
@@ -157,10 +157,10 @@ export interface TypedToolCall<TArgs = Record<string, any>, TResult = any> {
 
 /**
  * Statistics for tool call usage.
- * 
+ *
  * This interface tracks usage patterns and performance metrics for tools
  * used by AI agents.
- * 
+ *
  * @example
  * ```typescript
  * const stats: ToolCallStats = {
@@ -187,10 +187,10 @@ export interface ToolCallStats {
 
 /**
  * Union type of all possible normalized chunk types.
- * 
+ *
  * Defines the different types of streaming chunks that can be processed
  * from AI providers.
- * 
+ *
  * - `text_delta`: Incremental text content updates
  * - `tool_call_start`: Beginning of a tool call
  * - `tool_call_done`: Completion of a tool call
@@ -199,7 +199,7 @@ export interface ToolCallStats {
  * - `message_done`: Completion of a message
  * - `thinking_delta`: Incremental thinking/reasoning updates
  * - `error`: Error information
- * 
+ *
  * @example
  * ```typescript
  * const chunkType: NormalizedChunkType = "text_delta";
@@ -217,11 +217,11 @@ export type NormalizedChunkType =
 
 /**
  * Represents a normalized chunk of streaming data from AI providers.
- * 
+ *
  * This interface provides a unified format for handling chunks from different
  * AI providers (Anthropic, OpenAI) by normalizing their specific formats
  * into a common structure.
- * 
+ *
  * @example
  * ```typescript
  * const chunk: NormalizedChunk = {
@@ -261,13 +261,13 @@ export interface NormalizedChunk {
 
 /**
  * Generic callback function for handling any normalized chunk.
- * 
+ *
  * This type defines a callback that can process any type of normalized chunk.
  * The callback can be synchronous or asynchronous.
- * 
+ *
  * @param chunk - The normalized chunk to process
  * @returns Promise<void> | void
- * 
+ *
  * @example
  * ```typescript
  * const callback: ChunkCallback = async (chunk) => {
@@ -280,13 +280,13 @@ export type ChunkCallback = (chunk: NormalizedChunk) => void | Promise<void>;
 
 /**
  * Callback function for handling specific chunk types.
- * 
+ *
  * This type defines a callback that processes the data payload from a specific
  * chunk type. The callback can be synchronous or asynchronous.
- * 
+ *
  * @param data - The data payload from the chunk
  * @returns Promise<void> | void
- * 
+ *
  * @example
  * ```typescript
  * const textCallback: ChunkTypeCallback = async (data) => {
@@ -296,15 +296,17 @@ export type ChunkCallback = (chunk: NormalizedChunk) => void | Promise<void>;
  * };
  * ```
  */
-export type ChunkTypeCallback = (data: NormalizedChunk["data"]) => void | Promise<void>;
+export type ChunkTypeCallback = (
+  data: NormalizedChunk["data"],
+) => void | Promise<void>;
 
 /**
  * Configuration object for chunk handlers.
- * 
+ *
  * This interface defines all the callback functions that can be registered
  * to handle different types of chunks during processing. All callbacks are
  * optional and can be async.
- * 
+ *
  * @example
  * ```typescript
  * const handlers: ChunkHandlerConfig = {
