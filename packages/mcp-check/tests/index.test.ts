@@ -31,8 +31,7 @@ describe("get branches tool", function () {
           },
         },
       ])
-      .prompt("What branches are available in this Basehub repo?")
-      .execute();
+      .prompt("What branches are available in this Basehub repo?");
 
     expect(
       result.hasUsedTool("claude-3-5-haiku-20241022", "list_branches"),

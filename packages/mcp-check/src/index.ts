@@ -49,8 +49,7 @@ export {
  * }]);
  *
  * const result = await client
- *   .prompt("What tools are available?")
- *   .execute();
+ *   .prompt("What tools are available?");
  * ```
  */
 
@@ -299,9 +298,9 @@ export class AgentsClient<T extends ModelName = ModelName> {
     this.config = config;
   }
 
-  prompt(text: string): this {
+  prompt(text: string): Promise<AgentsResult<T>> {
     this.promptText = text;
-    return this;
+    return this.execute();
   }
 
   allowTools(tools: string[]): this {
