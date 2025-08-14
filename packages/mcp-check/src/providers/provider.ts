@@ -48,7 +48,7 @@ export abstract class Provider {
   constructor(mcpServer: McpServer, promptText: string, config: ProviderConfig = {}) {
     this.mcpServer = mcpServer;
     this.promptText = promptText;
-    this.config = config;
+    this.config = { silent: true, ...config };
   }
 
   /**

@@ -368,33 +368,7 @@ export class AnthropicProvider extends Provider {
   protected async processNormalizedChunk(
     normalizedChunk: NormalizedChunk,
   ): Promise<void> {
-    // Handle Anthropic-specific chunk types
-    if (normalizedChunk.originalChunk?.type === "content_block_delta") {
-      const handlers = this.getChunkHandlers();
-      if (handlers.anthropic?.onContentBlockDelta) {
-        await handlers.anthropic.onContentBlockDelta(
-          normalizedChunk.originalChunk,
-        );
-      }
-    }
-
-    if (normalizedChunk.originalChunk?.type === "content_block_start") {
-      const handlers = this.getChunkHandlers();
-      if (handlers.anthropic?.onContentBlockStart) {
-        await handlers.anthropic.onContentBlockStart(
-          normalizedChunk.originalChunk,
-        );
-      }
-    }
-
-    if (normalizedChunk.originalChunk?.type === "content_block_stop") {
-      const handlers = this.getChunkHandlers();
-      if (handlers.anthropic?.onContentBlockStop) {
-        await handlers.anthropic.onContentBlockStop(
-          normalizedChunk.originalChunk,
-        );
-      }
-    }
+    // Provider-specific handlers are invoked centrally by the normalizer
 
     // Handle text delta accumulation
     if (normalizedChunk.type === "text_delta") {
