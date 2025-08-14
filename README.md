@@ -2,7 +2,7 @@
 ⚠️ It's not usable yet, but docs and a stable release are coming in the next few weeks. Stay tuned.
 
 <p align="center">
-  <a href="https://x.com/fveiras_">
+  <a href="https://www.npmjs.com/package/mcp-check">
   <img width="1033" height="204" alt="ascii-art-image (1)" src="https://github.com/user-attachments/assets/e77a1383-c0af-4c04-92f6-ed4b941043a3" />
   </a>
 </p>

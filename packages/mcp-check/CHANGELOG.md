@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.4.1
+
+### Patch Changes
+
+- fix chunk duplication
+
 ## 0.4.0
 
 ### Minor Changes
