@@ -295,7 +295,7 @@ export class AgentsClient<T extends ModelName = ModelName> {
     this.models = models;
     this.mcpServer = mcpServer;
     this._scorers = scorers || [];
-    this.config = config;
+    this.config = { silent: true, ...config };
   }
 
   prompt(text: string): Promise<AgentsResult<T>> {
