@@ -277,14 +277,10 @@ export class OpenAIProvider extends Provider {
   protected async processNormalizedChunk(
     normalizedChunk: NormalizedChunk,
   ): Promise<void> {
-    await super.processNormalizedChunk(normalizedChunk);
-
-    // Backward compatibility
+    // Backward compatibility: keep logs but avoid duplicating state updates
     if (normalizedChunk.type === "tool_call_start") {
       const toolName = normalizedChunk.data.toolName;
       if (toolName) {
-        this.usedTools.push(toolName);
-
         if (!this.config.silent) {
           process.stdout.write(
             JSON.stringify({
@@ -294,55 +290,21 @@ export class OpenAIProvider extends Provider {
             }) + "\n"
           );
         }
-
-        if (!this.toolCalls[toolName]) {
-          this.toolCalls[toolName] = [];
-        }
-
-        this.toolCalls[toolName].push({
-          args: normalizedChunk.data.toolArgs || {},
-          result: null,
-        });
       }
     } else if (normalizedChunk.type === "tool_call_done") {
       const toolName = normalizedChunk.data.toolName;
-      if (
-        toolName &&
-        this.toolCalls[toolName] &&
-        this.toolCalls[toolName].length > 0
-      ) {
-        const lastCall =
-          this.toolCalls[toolName][this.toolCalls[toolName].length - 1];
-        if (lastCall) {
-          lastCall.result = { id: `result_${Date.now()}`, status: "completed" };
-
-          if (!this.config.silent) {
-            process.stdout.write(
-              JSON.stringify({
-                type: "model_stream",
-                model: this.currentModel,
-                text: `Tool ${toolName} completed\n`,
-              }) + "\n"
-            );
-          }
-        }
+      if (!this.config.silent && toolName) {
+        process.stdout.write(
+          JSON.stringify({
+            type: "model_stream",
+            model: this.currentModel,
+            text: `Tool ${toolName} completed\n`,
+          }) + "\n"
+        );
       }
     }
 
-    // Handle OpenAI-specific chunk types
-    if (normalizedChunk.originalChunk?.type === "response.output_item.added") {
-      const handlers = this.getChunkHandlers();
-      if (handlers.openai?.onResponseOutputItemAdded) {
-        await handlers.openai.onResponseOutputItemAdded(normalizedChunk.originalChunk);
-      }
-    }
-
-    if (normalizedChunk.originalChunk?.type === "response.output_item.done") {
-      const handlers = this.getChunkHandlers();
-      if (handlers.openai?.onResponseOutputItemDone) {
-        await handlers.openai.onResponseOutputItemDone(normalizedChunk.originalChunk);
-      }
-    }
+    // Provider-specific handlers are invoked centrally by the normalizer
 
     // Handle text delta accumulation
     if (normalizedChunk.type === "text_delta") {
