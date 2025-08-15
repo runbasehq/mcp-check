@@ -278,7 +278,7 @@ export class AgentsClient<T extends ModelName = ModelName> {
     return this;
   }
 
-  async execute(): Promise<AgentsResult<T>> {
+  private async execute(): Promise<AgentsResult<T>> {
     if (!this.mcpServer) {
       throw new Error("MCP server not set");
     }

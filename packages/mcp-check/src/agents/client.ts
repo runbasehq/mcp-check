@@ -76,8 +76,7 @@ export class AgentsClient<T extends ModelName = ModelName> {
    * @example
    * ```typescript
    * const result = await client
-   *   .prompt("What tools are available?")
-   *   .execute();
+   *   .prompt("What tools are available?");
    *
    * console.log("Execution time:", result.getExecutionResult().summary.executionTime);
    * console.log("Successful models:", result.getSuccessfulAgents());
