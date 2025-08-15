@@ -1,3 +1,6 @@
+import type { BetaRawContentBlockDeltaEvent, BetaRawContentBlockStartEvent, BetaRawContentBlockStopEvent, BetaRawMessageStreamEvent } from "@anthropic-ai/sdk/resources/beta.js";
+import type OpenAI from "openai";
+
 export interface ToolCall {
   /** Arguments passed to the tool function */
   args: Record<string, any>;
@@ -233,11 +236,9 @@ export type NormalizedChunkType =
  * };
  * ```
  */
-export interface NormalizedChunk {
+export interface BaseNormalizedChunk {
   /** The type of chunk being processed */
   type: NormalizedChunkType;
-  /** The AI provider that generated this chunk */
-  provider: "anthropic" | "openai";
   /** Timestamp when the chunk was received */
   timestamp: number;
   /** The normalized data payload for this chunk */
@@ -255,8 +256,25 @@ export interface NormalizedChunk {
     /** Additional data properties */
     [key: string]: any;
   };
-  /** The original provider-specific chunk data */
-  originalChunk?: any;
+}
+
+/**
+ * Union type of all possible normalized chunk types.
+ *
+ * Defines the different types of streaming chunks that can be processed
+ * from AI providers.
+ *
+ *
+ **/
+export type NormalizedChunk = NormalizedChunkAnthropic | NormalizedChunkOpenAI;
+export interface NormalizedChunkAnthropic extends BaseNormalizedChunk {
+  provider: "anthropic";
+  originalChunk: BetaRawMessageStreamEvent;
+}
+
+export interface NormalizedChunkOpenAI extends BaseNormalizedChunk {
+  provider: "openai";
+  originalChunk: OpenAI.Responses.ResponseStreamEvent;
 }
 
 /**
@@ -296,9 +314,7 @@ export type ChunkCallback = (chunk: NormalizedChunk) => void | Promise<void>;
  * };
  * ```
  */
-export type ChunkTypeCallback = (
-  data: NormalizedChunk["data"],
-) => void | Promise<void>;
+export type ChunkTypeCallback = (data: NormalizedChunk["data"]) => void | Promise<void>;
 
 /**
  * Configuration object for chunk handlers.
@@ -347,17 +363,17 @@ export interface ChunkHandlerConfig {
   /** Provider-specific handlers for Anthropic */
   anthropic?: {
     /** Handler for Anthropic content block delta chunks */
-    onContentBlockDelta?: (chunk: any) => void | Promise<void>;
+    onContentBlockDelta?: (chunk: BetaRawContentBlockDeltaEvent) => void | Promise<void>;
     /** Handler for Anthropic content block start chunks */
-    onContentBlockStart?: (chunk: any) => void | Promise<void>;
+    onContentBlockStart?: (chunk: BetaRawContentBlockStartEvent) => void | Promise<void>;
     /** Handler for Anthropic content block stop chunks */
-    onContentBlockStop?: (chunk: any) => void | Promise<void>;
+    onContentBlockStop?: (chunk: BetaRawContentBlockStopEvent) => void | Promise<void>;
   };
   /** Provider-specific handlers for OpenAI */
   openai?: {
     /** Handler for OpenAI response output item added chunks */
-    onResponseOutputItemAdded?: (chunk: any) => void | Promise<void>;
+    onResponseOutputItemAdded?: (chunk: OpenAI.Responses.ResponseOutputItemAddedEvent) => void | Promise<void>;
     /** Handler for OpenAI response output item done chunks */
-    onResponseOutputItemDone?: (chunk: any) => void | Promise<void>;
+    onResponseOutputItemDone?: (chunk: OpenAI.Responses.ResponseOutputItemDoneEvent) => void | Promise<void>;
   };
 }
