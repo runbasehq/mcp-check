@@ -1,3 +1,4 @@
+import type { Scorer } from "src/index.js";
 import type { ChunkHandlerConfig } from "../chunks/types.js";
 
 /**
@@ -28,6 +29,6 @@ export interface ProviderConfig {
   chunkHandlers?: ChunkHandlerConfig;
   /** Whether to suppress console output during execution */
   silent?: boolean;
-  /** Additional configuration properties */
-  [key: string]: any;
+  /** Scorers to score the output of the tools */
+  scorers?: Scorer[];
 }

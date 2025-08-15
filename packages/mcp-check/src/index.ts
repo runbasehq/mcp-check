@@ -1,12 +1,7 @@
 import { config } from "dotenv";
 import type { ModelName } from "./providers";
 import type { ProviderConfig } from "./providers/types";
-import type {
-  AgentResponse,
-  AgentsExecutionResult,
-  ToolCall,
-  ToolCallStats,
-} from "./chunks/types";
+import type { AgentResponse, AgentsExecutionResult, ToolCall, ToolCallStats } from "./chunks/types";
 import { createProvider } from "./providers";
 
 config();
@@ -31,7 +26,6 @@ export {
  * @template T - The type of model names to use
  * @param mcpServer - The MCP server configuration
  * @param models - Array of model names to execute
- * @param scorers - Array of scorers to score the output of the tools
  * @param config - Optional provider configuration (API keys, silent mode, etc.)
  * @returns A configured AgentsClient instance
  *
@@ -53,13 +47,8 @@ export {
  * ```
  */
 
-export function client<T extends ModelName>(
-  mcpServer: McpServer,
-  models: T[],
-  scorers?: Scorer[],
-  config: ProviderConfig = {},
-): AgentsClient<T> {
-  return new AgentsClient(mcpServer, models, scorers, config);
+export function client<T extends ModelName>(mcpServer: McpServer, models: T[], config: ProviderConfig = {}): AgentsClient<T> {
+  return new AgentsClient(mcpServer, models, config);
 }
 
 /**
@@ -86,15 +75,7 @@ export class Scorer {
   public scorer: (toolResponse: any) => number;
   public tool: string;
 
-  constructor({
-    name,
-    scorer,
-    tool,
-  }: {
-    name: string;
-    scorer: (toolResponse: any) => number;
-    tool: string;
-  }) {
+  constructor({ name, scorer, tool }: { name: string; scorer: (toolResponse: any) => number; tool: string }) {
     this.name = name;
     this.scorer = scorer;
     this.tool = tool;
@@ -107,17 +88,7 @@ export class McpServer {
   public name: string;
   public type: string;
 
-  constructor({
-    url,
-    authorizationToken,
-    name,
-    type,
-  }: {
-    url: string;
-    authorizationToken: string;
-    name: string;
-    type: string;
-  }) {
+  constructor({ url, authorizationToken, name, type }: { url: string; authorizationToken: string; name: string; type: string }) {
     this.url = url;
     this.authorizationToken = authorizationToken;
     this.name = name;
@@ -139,7 +110,7 @@ export class AgentsResult<T extends ModelName = ModelName> {
     endTime: number,
     models: T[],
     agentsInstance?: AgentsClient<T>,
-    scorers?: Scorer[],
+    scorers?: Scorer[]
   ) {
     this.responses = responses;
     this.executionStartTime = startTime;
@@ -189,15 +160,13 @@ export class AgentsResult<T extends ModelName = ModelName> {
     const successfulExecutions = Object.keys(this.responses).length;
     const failedExecutions = this.models.length - successfulExecutions;
 
-    const allTools = (Object.values(this.responses) as AgentResponse[]).flatMap(
-      (r) => r.usedTools,
-    );
+    const allTools = (Object.values(this.responses) as AgentResponse[]).flatMap((r) => r.usedTools);
     const toolCounts = allTools.reduce(
       (acc, tool) => {
         acc[tool] = (acc[tool] || 0) + 1;
         return acc;
       },
-      {} as Record<string, number>,
+      {} as Record<string, number>
     );
 
     const commonTools = Object.entries(toolCounts)
@@ -231,18 +200,13 @@ export class AgentsResult<T extends ModelName = ModelName> {
         }
 
         stats[toolName].callCount += (calls as any[]).length;
-        stats[toolName].lastCalled = Math.max(
-          stats[toolName].lastCalled || 0,
-          response.metadata?.timestamp || 0,
-        );
+        stats[toolName].lastCalled = Math.max(stats[toolName].lastCalled || 0, response.metadata?.timestamp || 0);
       });
     });
 
     return Object.values(stats).map((stat) => ({
       ...stat,
-      averageDuration: stat.totalDuration
-        ? stat.totalDuration / stat.callCount
-        : undefined,
+      averageDuration: stat.totalDuration ? stat.totalDuration / stat.callCount : undefined,
     }));
   }
 
@@ -286,15 +250,10 @@ export class AgentsClient<T extends ModelName = ModelName> {
   private config: ProviderConfig;
   private _scorers: Scorer[] = [];
 
-  constructor(
-    mcpServer: McpServer,
-    models: T[],
-    scorers?: Scorer[],
-    config: ProviderConfig = {},
-  ) {
+  constructor(mcpServer: McpServer, models: T[], config: ProviderConfig = {}) {
     this.models = models;
     this.mcpServer = mcpServer;
-    this._scorers = scorers || [];
+    this._scorers = config.scorers || [];
     this.config = { silent: true, ...config };
   }
 
@@ -313,13 +272,13 @@ export class AgentsClient<T extends ModelName = ModelName> {
       name: string;
       tool: string;
       scorer: (toolResponse: any) => number;
-    }>,
+    }>
   ): this {
     this._scorers = scorers.map((s) => new Scorer(s));
     return this;
   }
 
-  async execute(): Promise<AgentsResult<T>> {
+  private async execute(): Promise<AgentsResult<T>> {
     if (!this.mcpServer) {
       throw new Error("MCP server not set");
     }
@@ -327,12 +286,7 @@ export class AgentsClient<T extends ModelName = ModelName> {
     const executionStartTime = Date.now();
 
     this.executionPromises = this.models.map(async (model) => {
-      const provider = createProvider(
-        model,
-        this.mcpServer!,
-        this.promptText,
-        this.config,
-      );
+      const provider = createProvider(model, this.mcpServer!, this.promptText, this.config);
       const result = await provider.stream(model);
 
       this.usedTools[model] = result.usedTools;
@@ -358,16 +312,9 @@ export class AgentsClient<T extends ModelName = ModelName> {
         acc[response.model as T] = response;
         return acc;
       },
-      {} as Record<T, AgentResponse>,
+      {} as Record<T, AgentResponse>
     );
 
-    return new AgentsResult(
-      responsesMap,
-      executionStartTime,
-      executionEndTime,
-      this.models,
-      this,
-      this._scorers,
-    );
+    return new AgentsResult(responsesMap, executionStartTime, executionEndTime, this.models, this, this._scorers);
   }
 }

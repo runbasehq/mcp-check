@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.4.2
+
+### Patch Changes
+
+- improve typings
+
 ## 0.4.1
 
 ### Patch Changes
