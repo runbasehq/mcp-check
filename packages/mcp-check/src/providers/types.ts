@@ -3,10 +3,10 @@ import type { ChunkHandlerConfig } from "../chunks/types.js";
 
 /**
  * Configuration object for AI providers.
- * 
+ *
  * This interface defines the configuration options that can be passed to
  * AI providers for authentication, chunk handling, and other settings.
- * 
+ *
  * @example
  * ```typescript
  * const config: ProviderConfig = {
@@ -25,6 +25,8 @@ export interface ProviderConfig {
   anthropicApiKey?: string;
   /** API key for OpenAI services (GPT models) */
   openaiApiKey?: string;
+  /** API key for OpenRouter services (OpenRouter models) */
+  openrouterApiKey?: string;
   /** Configuration for handling streaming chunks */
   chunkHandlers?: ChunkHandlerConfig;
   /** Whether to suppress console output during execution */
