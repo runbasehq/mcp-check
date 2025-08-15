@@ -319,9 +319,7 @@ export type ChunkCallback = (chunk: NormalizedChunk) => void | Promise<void>;
  * };
  * ```
  */
-export type ChunkTypeCallback = (
-  data: NormalizedChunk["data"],
-) => void | Promise<void>;
+export type ChunkTypeCallback = (data: NormalizedChunk["data"]) => void | Promise<void>;
 
 /**
  * Configuration object for chunk handlers.

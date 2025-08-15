@@ -13,6 +13,7 @@ describe("get branches tool", function () {
       "anthropic/claude-3-haiku-20240307",
       "anthropic/claude-3-5-haiku-20241022",
     ])
+    const result = await client(mcpServer, ["claude-3-haiku-20240307", "claude-3-5-haiku-20241022"])
       .scorers([
         {
           name: "contains id",
@@ -21,9 +22,7 @@ describe("get branches tool", function () {
             try {
               const resultText = output[0]?.text;
               const branches = JSON.parse(resultText);
-              return branches.some((branch: { id: string }) => branch.id)
-                ? 1
-                : 0;
+              return branches.some((branch: { id: string }) => branch.id) ? 1 : 0;
             } catch (e) {
               console.log("Parse error:", e);
               return 0;
