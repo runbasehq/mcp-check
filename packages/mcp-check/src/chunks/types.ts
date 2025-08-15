@@ -1,4 +1,9 @@
-import type { BetaRawContentBlockDeltaEvent, BetaRawContentBlockStartEvent, BetaRawContentBlockStopEvent, BetaRawMessageStreamEvent } from "@anthropic-ai/sdk/resources/beta.js";
+import type {
+  BetaRawContentBlockDeltaEvent,
+  BetaRawContentBlockStartEvent,
+  BetaRawContentBlockStopEvent,
+  BetaRawMessageStreamEvent,
+} from "@anthropic-ai/sdk/resources/beta.js";
 import type OpenAI from "openai";
 
 export interface ToolCall {
@@ -273,7 +278,7 @@ export interface NormalizedChunkAnthropic extends BaseNormalizedChunk {
 }
 
 export interface NormalizedChunkOpenAI extends BaseNormalizedChunk {
-  provider: "openai";
+  provider: "openai" | "openrouter";
   originalChunk: OpenAI.Responses.ResponseStreamEvent;
 }
 
@@ -363,17 +368,27 @@ export interface ChunkHandlerConfig {
   /** Provider-specific handlers for Anthropic */
   anthropic?: {
     /** Handler for Anthropic content block delta chunks */
-    onContentBlockDelta?: (chunk: BetaRawContentBlockDeltaEvent) => void | Promise<void>;
+    onContentBlockDelta?: (
+      chunk: BetaRawContentBlockDeltaEvent,
+    ) => void | Promise<void>;
     /** Handler for Anthropic content block start chunks */
-    onContentBlockStart?: (chunk: BetaRawContentBlockStartEvent) => void | Promise<void>;
+    onContentBlockStart?: (
+      chunk: BetaRawContentBlockStartEvent,
+    ) => void | Promise<void>;
     /** Handler for Anthropic content block stop chunks */
-    onContentBlockStop?: (chunk: BetaRawContentBlockStopEvent) => void | Promise<void>;
+    onContentBlockStop?: (
+      chunk: BetaRawContentBlockStopEvent,
+    ) => void | Promise<void>;
   };
   /** Provider-specific handlers for OpenAI */
   openai?: {
     /** Handler for OpenAI response output item added chunks */
-    onResponseOutputItemAdded?: (chunk: OpenAI.Responses.ResponseOutputItemAddedEvent) => void | Promise<void>;
+    onResponseOutputItemAdded?: (
+      chunk: OpenAI.Responses.ResponseOutputItemAddedEvent,
+    ) => void | Promise<void>;
     /** Handler for OpenAI response output item done chunks */
-    onResponseOutputItemDone?: (chunk: OpenAI.Responses.ResponseOutputItemDoneEvent) => void | Promise<void>;
+    onResponseOutputItemDone?: (
+      chunk: OpenAI.Responses.ResponseOutputItemDoneEvent,
+    ) => void | Promise<void>;
   };
 }

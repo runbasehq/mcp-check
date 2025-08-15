@@ -112,7 +112,7 @@ export class AnthropicProvider extends Provider {
     this.currentModel = model;
 
     const stream = this.client.beta.messages.stream({
-      model: model as Anthropic.Model,
+      model: model.replace("anthropic/", "") as Anthropic.Model,
       max_tokens: 1000,
       messages: [
         {
