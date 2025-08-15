@@ -253,7 +253,7 @@ export class AgentsClient<T extends ModelName = ModelName> {
   constructor(mcpServer: McpServer, models: T[], config: ProviderConfig = {}) {
     this.models = models;
     this.mcpServer = mcpServer;
-    this._scorers = [];
+    this._scorers = config.scorers || [];
     this.config = { silent: true, ...config };
   }
 
