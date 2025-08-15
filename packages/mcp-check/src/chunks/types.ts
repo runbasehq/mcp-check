@@ -271,7 +271,7 @@ export interface BaseNormalizedChunk {
  *
  *
  **/
-export type NormalizedChunk = NormalizedChunkAnthropic | NormalizedChunkOpenAI;
+export type NormalizedChunk = NormalizedChunkAnthropic | NormalizedChunkOpenAI | NormalizedChunkOpenRouter;
 export interface NormalizedChunkAnthropic extends BaseNormalizedChunk {
   provider: "anthropic";
   originalChunk: BetaRawMessageStreamEvent;
@@ -280,6 +280,11 @@ export interface NormalizedChunkAnthropic extends BaseNormalizedChunk {
 export interface NormalizedChunkOpenAI extends BaseNormalizedChunk {
   provider: "openai" | "openrouter";
   originalChunk: OpenAI.Responses.ResponseStreamEvent;
+}
+
+export interface NormalizedChunkOpenRouter extends BaseNormalizedChunk {
+  provider: "openrouter";
+  originalChunk: OpenAI.Chat.ChatCompletionChunk;
 }
 
 /**
@@ -390,5 +395,9 @@ export interface ChunkHandlerConfig {
     onResponseOutputItemDone?: (
       chunk: OpenAI.Responses.ResponseOutputItemDoneEvent,
     ) => void | Promise<void>;
+  };
+  openrouter?: {
+    /** Handler for OpenRouter chat completion chunk */
+    onChatCompletionChunk?: (chunk: OpenAI.Chat.ChatCompletionChunk) => void | Promise<void>;
   };
 }

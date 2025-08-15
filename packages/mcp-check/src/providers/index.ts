@@ -1,11 +1,14 @@
 import type { McpServer } from "../index.js";
 import type { AnthropicModel } from "./anthropic.js";
 import type { OpenAIModel } from "./openai.js";
+import type { OpenRouterModel } from "./openrouter.js";
 import { AnthropicProvider } from "./anthropic.js";
 import { OpenAIProvider } from "./openai.js";
+import { OpenRouterProvider } from "./openrouter.js";
 import type { ProviderConfig } from "./types.js";
 import { Provider } from "./provider.js";
-import { type OpenRouterModel } from "./openrouter.js";
+
+export type { ProviderConfig } from "./types.js";
 
 /**
  * @fileoverview Provider factory and type exports for MCP AI providers.
@@ -52,7 +55,7 @@ export type { OpenRouterModel } from "./openrouter.js";
  *
  * @example
  * ```typescript
- * const models: ModelName[] = ["claude-3-haiku-20240307", "gpt-4"];
+ * const models: ModelName[] = ["claude-3-haiku-20240307", "gpt-4", "moonshotai/kimi-k2:free"];
  * ```
  */
 export type ModelName =
@@ -101,10 +104,19 @@ export type Models = ModelName[];
  *   "What tools are available?",
  *   { openaiApiKey: process.env.OPENAI_API_KEY }
  * );
+ * 
+ * // Create provider for OpenRouter model
+ * const openrouterProvider = createProvider(
+ *   "moonshotai/kimi-k2:free",
+ *   mcpServer,
+ *   "What tools are available?",
+ *   { openrouterApiKey: process.env.OPENROUTER_API_KEY }
+ * );
  *
  * // Use the providers
  * const anthropicResult = await anthropicProvider.stream("anthropic/claude-3-haiku-20240307");
  * const openaiResult = await openaiProvider.stream("openai/gpt-4");
+ * const openrouterResult = await openrouterProvider.stream("moonshotai/kimi-k2:free");
  * ```
  */
 export function createProvider(
@@ -122,6 +134,11 @@ export function createProvider(
   }
 
   if (model.startsWith("openrouter/")) {
+  }
+
+  // OpenRouter models (various providers like deepseek, anthropic, etc.)
+  if (model.includes("/")) {
+    return new OpenRouterProvider(mcpServer, promptText, config);
   }
 
   throw new Error(`Error: unknown provider for model: ${model}.`);

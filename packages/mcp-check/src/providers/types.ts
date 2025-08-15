@@ -25,7 +25,7 @@ export interface ProviderConfig {
   anthropicApiKey?: string;
   /** API key for OpenAI services (GPT models) */
   openaiApiKey?: string;
-  /** API key for OpenRouter services (OpenRouter models) */
+  /** API key for OpenRouter services */
   openrouterApiKey?: string;
   /** Configuration for handling streaming chunks */
   chunkHandlers?: ChunkHandlerConfig;

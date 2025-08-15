@@ -1,3 +1,4 @@
+import type OpenAI from "openai";
 import type { NormalizedChunk, ChunkHandlerConfig } from "./types.js";
 
 export class ChunkNormalizer {
@@ -19,6 +20,10 @@ export class ChunkNormalizer {
       }
       if (handlers.openai?.onResponseOutputItemDone && normalizedChunk.originalChunk?.type === "response.output_item.done") {
         await handlers.openai.onResponseOutputItemDone(normalizedChunk.originalChunk);
+      }
+    } else if (normalizedChunk.provider === "openrouter") {
+      if (handlers.openrouter?.onChatCompletionChunk) {
+        await handlers.openrouter.onChatCompletionChunk(normalizedChunk.originalChunk as OpenAI.Chat.ChatCompletionChunk);
       }
     }
 
