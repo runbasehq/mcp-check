@@ -1,10 +1,11 @@
 import type {
+  BetaRateLimitError,
   BetaRawContentBlockDeltaEvent,
   BetaRawContentBlockStartEvent,
   BetaRawContentBlockStopEvent,
   BetaRawMessageStreamEvent,
 } from "@anthropic-ai/sdk/resources/beta.js";
-import type OpenAI from "openai";
+import type { Responses } from "openai/resources";
 
 export interface ToolCall {
   /** Arguments passed to the tool function */
@@ -214,13 +215,12 @@ export interface ToolCallStats {
  * ```
  */
 export type NormalizedChunkType =
+  | "text_start"
   | "text_delta"
   | "tool_call_start"
-  | "tool_call_done"
+  | "tool_call_delta"
   | "tool_result"
-  | "message_start"
-  | "message_done"
-  | "thinking_delta"
+  | "block_stop"
   | "error";
 
 /**
@@ -246,21 +246,74 @@ export interface BaseNormalizedChunk {
   type: NormalizedChunkType;
   /** Timestamp when the chunk was received */
   timestamp: number;
+  /** Index of the chunk within the stream */
+  index: number;
   /** The normalized data payload for this chunk */
   data: {
-    /** Text content for text-related chunks */
-    text?: string;
-    /** Name of the tool for tool-related chunks */
-    toolName?: string;
-    /** Arguments for tool calls */
-    toolArgs?: Record<string, any>;
-    /** Result from tool execution */
-    toolResult?: any;
     /** Error message for error chunks */
     error?: string;
     /** Additional data properties */
     [key: string]: any;
   };
+}
+
+export interface NormalizedTextDeltaChunk extends BaseNormalizedChunk {
+  type: "text_delta";
+  data: {
+    /** Text content for text-related chunks */
+    textDelta: string;
+
+  }
+}
+
+export interface NormalizedToolCallStartChunk extends BaseNormalizedChunk {
+  type: "tool_call_start";
+  data: {
+    /** ID of the tool for tool-related chunks */
+    toolId: string;
+    /** Name of the tool for tool-related chunks */
+    toolName: string;
+  }
+}
+
+export interface NormalizedToolCallDeltaChunk extends BaseNormalizedChunk {
+  type: "tool_call_delta";
+  data: {
+    /** Text content for tool-related chunks */
+    toolDelta: string;
+  }
+}
+
+export interface NormalizedTextStartChunk extends BaseNormalizedChunk {
+  type: "text_start";
+  data: {
+    /** Initial text content */
+    text?: string;
+  }
+}
+
+export interface NormalizedToolResultChunk extends BaseNormalizedChunk {
+  type: "tool_result";
+  data: {
+    toolId: string;
+    isError: boolean;
+    toolResult: any;
+  }
+}
+
+export interface NormalizedBlockStopChunk extends BaseNormalizedChunk {
+  type: "block_stop";
+  data: {}
+}
+
+export interface NormalizedErrorChunk extends BaseNormalizedChunk {
+  type: "error";
+  data: {
+    /** Error message */
+    error: string;
+    /** Error code if available */
+    errorCode?: string;
+  }
 }
 
 /**
@@ -271,16 +324,26 @@ export interface BaseNormalizedChunk {
  *
  *
  **/
-export type NormalizedChunk = NormalizedChunkAnthropic | NormalizedChunkOpenAI;
-export interface NormalizedChunkAnthropic extends BaseNormalizedChunk {
-  provider: "anthropic";
-  originalChunk: BetaRawMessageStreamEvent;
-}
+export type AgnosticNormalizedChunk =
+  | NormalizedTextStartChunk
+  | NormalizedTextDeltaChunk
+  | NormalizedToolCallStartChunk
+  | NormalizedToolCallDeltaChunk
+  | NormalizedToolResultChunk
+  | NormalizedBlockStopChunk
+  | NormalizedErrorChunk;
 
-export interface NormalizedChunkOpenAI extends BaseNormalizedChunk {
+export type NormalizedChunkAnthropic = (AgnosticNormalizedChunk & {
+  provider: "anthropic";
+  originalChunk: BetaRawMessageStreamEvent | BetaRateLimitError;
+});
+
+export type NormalizedChunkOpenAI = (AgnosticNormalizedChunk & {
   provider: "openai" | "openrouter";
-  originalChunk: OpenAI.Responses.ResponseStreamEvent;
-}
+  originalChunk: Responses.ResponseOutputItemAddedEvent | Responses.ResponseOutputItemDoneEvent | Responses.ResponseStreamEvent | Responses.ResponseOutputItem | Responses.ResponseOutputItemDoneEvent;
+});
+
+export type NormalizedChunk = NormalizedChunkAnthropic | NormalizedChunkOpenAI;
 
 /**
  * Generic callback function for handling any normalized chunk.
@@ -319,7 +382,7 @@ export type ChunkCallback = (chunk: NormalizedChunk) => void | Promise<void>;
  * };
  * ```
  */
-export type ChunkTypeCallback = (data: NormalizedChunk["data"]) => void | Promise<void>;
+export type ChunkTypeCallback<T extends AgnosticNormalizedChunk = AgnosticNormalizedChunk> = (data: T["data"]) => void | Promise<void>;
 
 /**
  * Configuration object for chunk handlers.
@@ -331,9 +394,12 @@ export type ChunkTypeCallback = (data: NormalizedChunk["data"]) => void | Promis
  * @example
  * ```typescript
  * const handlers: ChunkHandlerConfig = {
+ *   onTextStart: (data) => console.log("Text start:", data.text),
  *   onTextDelta: (data) => console.log("Text:", data.text),
  *   onToolCallStart: (data) => console.log("Tool started:", data.toolName),
- *   onToolCallDone: (data) => console.log("Tool finished:", data.toolName),
+ *   onToolCallDelta: (data) => console.log("Tool delta:", data.toolName),
+ *   onToolResultStart: (data) => console.log("Tool result:", data.toolResult),
+ *   onBlockStop: (data) => console.log("Block stopped"),
  *   onError: (data) => console.error("Error:", data.error),
  *   onAnyChunk: (chunk) => console.log("Any chunk:", chunk.type),
  *   anthropic: {
@@ -346,22 +412,20 @@ export type ChunkTypeCallback = (data: NormalizedChunk["data"]) => void | Promis
  * ```
  */
 export interface ChunkHandlerConfig {
+  /** Callback for text start chunks */
+  onTextStart?: ChunkTypeCallback<NormalizedTextStartChunk>;
   /** Callback for text delta chunks */
-  onTextDelta?: ChunkTypeCallback;
+  onTextDelta?: ChunkTypeCallback<NormalizedTextDeltaChunk>;
   /** Callback for tool call start chunks */
-  onToolCallStart?: ChunkTypeCallback;
-  /** Callback for tool call done chunks */
-  onToolCallDone?: ChunkTypeCallback;
-  /** Callback for tool result chunks */
-  onToolResult?: ChunkTypeCallback;
-  /** Callback for message start chunks */
-  onMessageStart?: ChunkTypeCallback;
-  /** Callback for message done chunks */
-  onMessageDone?: ChunkTypeCallback;
-  /** Callback for thinking delta chunks */
-  onThinkingDelta?: ChunkTypeCallback;
+  onToolCallStart?: ChunkTypeCallback<NormalizedToolCallStartChunk>;
+  /** Callback for tool call delta chunks */
+  onToolCallDelta?: ChunkTypeCallback<NormalizedToolCallDeltaChunk>;
+  /** Callback for tool result start chunks */
+  onToolResult?: ChunkTypeCallback<NormalizedToolResultChunk>;
+  /** Callback for block stop chunks */
+  onBlockStop?: ChunkTypeCallback<NormalizedBlockStopChunk>;
   /** Callback for error chunks */
-  onError?: ChunkTypeCallback;
+  onError?: ChunkTypeCallback<NormalizedErrorChunk>;
   /** Callback for any chunk type */
   onAnyChunk?: ChunkCallback;
 
@@ -384,11 +448,11 @@ export interface ChunkHandlerConfig {
   openai?: {
     /** Handler for OpenAI response output item added chunks */
     onResponseOutputItemAdded?: (
-      chunk: OpenAI.Responses.ResponseOutputItemAddedEvent,
+      chunk: Responses.ResponseOutputItemAddedEvent,
     ) => void | Promise<void>;
     /** Handler for OpenAI response output item done chunks */
     onResponseOutputItemDone?: (
-      chunk: OpenAI.Responses.ResponseOutputItemDoneEvent,
+      chunk: Responses.ResponseOutputItemDoneEvent,
     ) => void | Promise<void>;
   };
 }
