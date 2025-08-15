@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.4.3
+
+### Patch Changes
+
+- feat: add provider name prefix to model identifiers
+
 ## 0.4.2
 
 ### Patch Changes
