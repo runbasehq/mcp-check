@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.4.4
+
+### Patch Changes
+
+- Fix how openai and anthropic handlers were normalizing chunks
+
 ## 0.4.3
 
 ### Patch Changes

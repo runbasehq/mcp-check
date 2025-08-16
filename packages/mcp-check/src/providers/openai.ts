@@ -1,9 +1,11 @@
 import OpenAI from "openai";
-import type { ChatModel } from "openai/resources";
+import type { ChatModel, Responses } from "openai/resources";
 import { Provider } from "./provider.js";
-import type { StreamResult, NormalizedChunk } from "../chunks/types.js";
+import type { StreamResult, NormalizedChunk, NormalizedChunkOpenAI } from "../chunks/types.js";
 import type { ProviderConfig } from "./types.js";
 import type { McpServer } from "../index.js";
+
+type OpenAIChunk = Responses.ResponseOutputItemDoneEvent | Responses.ResponseContentPartAddedEvent | Responses.ResponseTextDeltaEvent | Responses.ResponseMcpCallArgumentsDeltaEvent | Responses.ResponseOutputItemAddedEvent | Responses.ResponseErrorEvent;
 
 /**
  * Type alias for OpenAI model names.
@@ -126,8 +128,6 @@ export class OpenAIProvider extends Provider {
       stream: true,
     });
 
-    let content = "";
-
     if (!this.config.silent) {
       process.stdout.write(
         JSON.stringify({
@@ -199,87 +199,89 @@ export class OpenAIProvider extends Provider {
    * }
    * ```
    */
-  protected normalizeChunk(chunk: any): NormalizedChunk | null {
+  protected normalizeChunk(chunk: OpenAIChunk): NormalizedChunk | null {
     const timestamp = Date.now();
 
-    // Handle response output item added (tool call start)
-    if (chunk.type === "response.output_item.added") {
-      const item = chunk.item;
-      if (item.type === "mcp_call") {
-        return {
-          type: "tool_call_start",
-          provider: "openai",
-          timestamp,
-          data: {
-            toolName: item.name,
-            toolArgs: item.arguments || {},
-          },
-          originalChunk: chunk,
-        };
-      }
-    }
-
-    // Handle response output item done (tool call done)
-    if (chunk.type === "response.output_item.done") {
-      const item = chunk.item;
-      if (item.type === "mcp_call") {
-        return {
-          type: "tool_call_done",
-          provider: "openai",
-          timestamp,
-          data: {
-            toolName: item.name,
-            toolResult: (item as any).result,
-          },
-          originalChunk: chunk,
-        };
-      }
-    }
-
-    // Handle response output item added (text content)
-    if (chunk.type === "response.output_item.added") {
-      const item = chunk.item;
-      if (item.type === "text") {
-        return {
-          type: "text_delta",
-          provider: "openai",
-          timestamp,
-          data: { text: item.text },
-          originalChunk: chunk,
-        };
-      }
-    }
-
-    // Handle response start
-    if (chunk.type === "response.start") {
-      return {
-        type: "message_start",
-        provider: "openai",
-        timestamp,
-        data: { model: this.currentModel },
-        originalChunk: chunk,
-      };
-    }
-
-    // Handle response done
-    if (chunk.type === "response.done") {
-      return {
-        type: "message_done",
-        provider: "openai",
-        timestamp,
-        data: { model: this.currentModel },
-        originalChunk: chunk,
-      };
-    }
-
-    // Handle error
     if (chunk.type === "error") {
       return {
-        type: "error",
         provider: "openai",
         timestamp,
-        data: { error: chunk.error?.message || "Unknown error" },
+        index: -1,
+        type: "error",
+        data: { error: chunk.message },
         originalChunk: chunk,
+      };
+    }
+
+    const baseChunk: Pick<NormalizedChunkOpenAI, "provider" | "timestamp" | "index" | "originalChunk"> = {
+      provider: "openai",
+      timestamp,
+      index: chunk.output_index,
+      originalChunk: chunk,
+    };
+
+    // text_start
+    if (chunk.type === "response.content_part.added" && chunk.part.type === "output_text") {
+      return {
+        ...baseChunk,
+        type: "text_start",
+        data: {
+          text: ""
+        }
+      };
+    }
+
+    // text_delta
+    if (chunk.type === "response.output_text.delta") {
+      return {
+        ...baseChunk,
+        type: "text_delta",
+        data: {
+          textDelta: chunk.delta
+        },
+      }
+    }
+
+    // tool_call_start
+    if (chunk.type === "response.output_item.added" && chunk.item.type === "mcp_call") {
+      return {
+        ...baseChunk,
+        type: "tool_call_start",
+        data: {
+          toolName: chunk.item.name,
+          toolId: chunk.item.id
+        },
+      }
+    }
+
+    // tool_call_delta
+    if (chunk.type === "response.mcp_call_arguments.delta") {
+      return {
+        ...baseChunk,
+        type: "tool_call_delta",
+        data: { toolDelta: chunk.delta },
+      };
+    }
+
+    // tool_result
+    if (chunk.type === "response.output_item.done" && chunk.item.type === "mcp_call") {
+      return {
+        ...baseChunk,
+        type: "tool_result",
+        data: {
+          toolId: chunk.item.id,
+          isError: !chunk.item.error,
+          toolResult: chunk.item.output,
+        },
+      }
+    }
+
+    // block_stop
+    if (chunk.type === "response.output_item.done") {
+      return {
+        ...baseChunk,
+        type: "block_stop",
+        data: {},
       };
     }
 
@@ -303,8 +305,8 @@ export class OpenAIProvider extends Provider {
           );
         }
       }
-    } else if (normalizedChunk.type === "tool_call_done") {
-      const toolName = normalizedChunk.data.toolName;
+    } else if (normalizedChunk.type === "tool_result") {
+      const toolName = normalizedChunk.data.toolId;
       if (!this.config.silent && toolName) {
         process.stdout.write(
           JSON.stringify({
@@ -320,7 +322,7 @@ export class OpenAIProvider extends Provider {
 
     // Handle text delta accumulation
     if (normalizedChunk.type === "text_delta") {
-      const text = normalizedChunk.data.text;
+      const text = normalizedChunk.data.textDelta;
       if (text) {
         this.content += text;
       }

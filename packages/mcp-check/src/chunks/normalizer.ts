@@ -23,6 +23,11 @@ export class ChunkNormalizer {
     }
 
     switch (normalizedChunk.type) {
+      case "text_start":
+        if (handlers.onTextStart) {
+          await handlers.onTextStart(normalizedChunk.data);
+        }
+        break;
       case "text_delta":
         if (handlers.onTextDelta) {
           await handlers.onTextDelta(normalizedChunk.data);
@@ -33,9 +38,9 @@ export class ChunkNormalizer {
           await handlers.onToolCallStart(normalizedChunk.data);
         }
         break;
-      case "tool_call_done":
-        if (handlers.onToolCallDone) {
-          await handlers.onToolCallDone(normalizedChunk.data);
+      case "tool_call_delta":
+        if (handlers.onToolCallDelta) {
+          await handlers.onToolCallDelta(normalizedChunk.data);
         }
         break;
       case "tool_result":
@@ -43,19 +48,9 @@ export class ChunkNormalizer {
           await handlers.onToolResult(normalizedChunk.data);
         }
         break;
-      case "message_start":
-        if (handlers.onMessageStart) {
-          await handlers.onMessageStart(normalizedChunk.data);
-        }
-        break;
-      case "message_done":
-        if (handlers.onMessageDone) {
-          await handlers.onMessageDone(normalizedChunk.data);
-        }
-        break;
-      case "thinking_delta":
-        if (handlers.onThinkingDelta) {
-          await handlers.onThinkingDelta(normalizedChunk.data);
+      case "block_stop":
+        if (handlers.onBlockStop) {
+          await handlers.onBlockStop(normalizedChunk.data);
         }
         break;
       case "error":
