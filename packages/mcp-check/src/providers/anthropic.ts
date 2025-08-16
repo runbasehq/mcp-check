@@ -1,9 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Provider } from "./provider.js";
-import type { StreamResult, NormalizedChunk } from "../chunks/types.js";
+import type { StreamResult, NormalizedChunk, NormalizedChunkAnthropic } from "../chunks/types.js";
 import type { McpServer } from "../index.js";
 import type { ProviderConfig } from "./types.js";
+import type { BetaRawContentBlockDeltaEvent, BetaRawContentBlockStartEvent, BetaRawContentBlockStopEvent } from "@anthropic-ai/sdk/resources/beta.js";
+import type { BetaRateLimitError } from "@anthropic-ai/sdk/resources";
 
+type AnthropicChunk = BetaRawContentBlockDeltaEvent | BetaRawContentBlockStartEvent | BetaRawContentBlockStopEvent | BetaRateLimitError;
 /**
  * Type alias for Anthropic model names.
  *
@@ -113,6 +116,7 @@ export class AnthropicProvider extends Provider {
 
     const stream = this.client.beta.messages.stream({
       model: model.replace("anthropic/", "") as Anthropic.Model,
+      //TODO: Use max_tokens from config
       max_tokens: 1000,
       messages: [
         {
@@ -164,7 +168,7 @@ export class AnthropicProvider extends Provider {
 
     const finalMessage = await stream.finalMessage();
 
-    // Update tool call results from the final message
+    //TODO: Implement this with normalized chunks and avoid provider-specific logic
     if (finalMessage.content) {
       for (const block of finalMessage.content) {
         if (block.type === "mcp_tool_result") {
@@ -190,6 +194,7 @@ export class AnthropicProvider extends Provider {
     };
   }
 
+
   /**
    * Normalizes Anthropic-specific chunks into the unified NormalizedChunk format.
    *
@@ -208,42 +213,59 @@ export class AnthropicProvider extends Provider {
    * }
    * ```
    */
-  protected normalizeChunk(chunk: any): NormalizedChunk | null {
+  protected normalizeChunk(chunk: AnthropicChunk): NormalizedChunk | null {
     const timestamp = Date.now();
 
-    if (chunk.type === "content_block_delta") {
-      if (chunk.delta.type === "text_delta") {
-        if (!this.config.silent) {
-          process.stdout.write(
-            JSON.stringify({
-              type: "model_stream",
-              model: this.currentModel,
-              text: chunk.delta.text,
-            }) + "\n",
-          );
-        }
-        return {
-          type: "text_delta",
-          provider: "anthropic",
-          timestamp,
-          data: { text: chunk.delta.text },
-          originalChunk: chunk,
-        };
-      } else if (chunk.delta.type === "thinking_delta") {
-        return {
-          type: "thinking_delta",
-          provider: "anthropic",
-          timestamp,
-          data: { thinking: chunk.delta.thinking },
-          originalChunk: chunk,
-        };
+    if (chunk.type === "rate_limit_error") {
+      return {
+        provider: "anthropic",
+        timestamp,
+        index: -1,
+        type: "error",
+        data: { error: chunk.message },
+        originalChunk: chunk,
+      };
+    }
+
+    const baseChunk: Pick<NormalizedChunkAnthropic, "provider" | "timestamp" | "index" | "originalChunk"> = {
+      provider: "anthropic",
+      timestamp,
+      index: chunk.index,
+      originalChunk: chunk,
+    };
+
+
+
+    if (chunk.type === "content_block_start" && chunk.content_block.type === "text") {
+      return {
+        ...baseChunk,
+        type: "text_start",
+        data: {
+          text: chunk.content_block.text,
+        },
+      };
+    }
+
+    if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+      if (!this.config.silent) {
+        process.stdout.write(
+          JSON.stringify({
+            type: "model_stream",
+            model: this.currentModel,
+            text: chunk.delta.text,
+          }) + "\n",
+        );
+      }
+      return {
+        ...baseChunk,
+        type: "text_delta",
+        data: { textDelta: chunk.delta.text },
       }
     }
 
-    // Handle content block start (tool call start)
     if (
       chunk.type === "content_block_start" &&
-      chunk.content_block?.type === "mcp_tool_use"
+      chunk.content_block.type === "mcp_tool_use"
     ) {
       this.currentToolName = chunk.content_block.name;
       if (!this.config.silent) {
@@ -256,21 +278,39 @@ export class AnthropicProvider extends Provider {
         );
       }
       return {
+        ...baseChunk,
         type: "tool_call_start",
-        provider: "anthropic",
-        timestamp,
         data: {
           toolName: chunk.content_block.name,
-          toolArgs: chunk.content_block.input || {},
+          toolId: chunk.content_block.id,
         },
-        originalChunk: chunk,
       };
     }
 
-    // Handle content block stop (tool call done)
+    if (chunk.type === "content_block_delta" && chunk.delta.type === "input_json_delta") {
+      return {
+        ...baseChunk,
+        type: "tool_call_delta",
+        data: {
+          toolDelta: chunk.delta.partial_json,
+        },
+      };
+    }
+
+    if (chunk.type === "content_block_start" && chunk.content_block.type === "mcp_tool_result") {
+      return {
+        ...baseChunk,
+        type: "tool_result",
+        data: {
+          toolId: chunk.content_block.tool_use_id,
+          isError: chunk.content_block.is_error,
+          toolResult: chunk.content_block.content,
+        },
+      }
+    }
+
     if (
-      chunk.type === "content_block_stop" &&
-      chunk.content_block?.type === "mcp_tool_use"
+      chunk.type === "content_block_stop"
     ) {
       if (!this.config.silent) {
         process.stdout.write(
@@ -282,66 +322,9 @@ export class AnthropicProvider extends Provider {
         );
       }
       return {
-        type: "tool_call_done",
-        provider: "anthropic",
-        timestamp,
-        data: {
-          toolName: this.currentToolName || "",
-        },
-        originalChunk: chunk,
-      };
-    }
-
-    // Handle message start
-    if (chunk.type === "message_start") {
-      return {
-        type: "message_start",
-        provider: "anthropic",
-        timestamp,
-        data: { model: this.currentModel },
-        originalChunk: chunk,
-      };
-    }
-
-    // Handle message delta (thinking)
-    if (chunk.type === "message_delta" && chunk.delta?.thinking) {
-      if (!this.config.silent) {
-        process.stdout.write(
-          JSON.stringify({
-            type: "model_stream",
-            model: this.currentModel,
-            text: `Thinking: ${chunk.delta.thinking}\n`,
-          }) + "\n",
-        );
-      }
-      return {
-        type: "thinking_delta",
-        provider: "anthropic",
-        timestamp,
-        data: { thinking: chunk.delta.thinking },
-        originalChunk: chunk,
-      };
-    }
-
-    // Handle message stop (message done)
-    if (chunk.type === "message_stop") {
-      return {
-        type: "message_done",
-        provider: "anthropic",
-        timestamp,
-        data: { model: this.currentModel },
-        originalChunk: chunk,
-      };
-    }
-
-    // Handle error
-    if (chunk.type === "error") {
-      return {
-        type: "error",
-        provider: "anthropic",
-        timestamp,
-        data: { error: chunk.error?.message || "Unknown error" },
-        originalChunk: chunk,
+        ...baseChunk,
+        type: "block_stop",
+        data: {},
       };
     }
 
@@ -372,7 +355,7 @@ export class AnthropicProvider extends Provider {
 
     // Handle text delta accumulation
     if (normalizedChunk.type === "text_delta") {
-      const text = normalizedChunk.data.text;
+      const text = normalizedChunk.data.textDelta;
       if (text) {
         this.content += text;
       }
