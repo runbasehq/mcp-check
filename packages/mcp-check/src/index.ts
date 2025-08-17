@@ -84,15 +84,15 @@ export class Scorer {
 
 export class McpServer {
   public url: string;
-  public authorizationToken: string;
+  public authorizationToken?: string;
   public name: string;
   public type: string;
 
-  constructor({ url, authorizationToken, name, type }: { url: string; authorizationToken: string; name: string; type: string }) {
+  constructor({ url, authorizationToken, name, type }: { url: string; authorizationToken?: string; name: string; type: string }) {
     this.url = url;
-    this.authorizationToken = authorizationToken;
     this.name = name;
     this.type = type;
+    this.authorizationToken = authorizationToken;
   }
 }
 

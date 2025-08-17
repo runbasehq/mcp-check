@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.4.6
+
+### Patch Changes
+
+- Fix empty authorization token config option
+
 ## 0.4.5
 
 ### Patch Changes

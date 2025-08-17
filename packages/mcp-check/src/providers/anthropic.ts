@@ -127,9 +127,9 @@ export class AnthropicProvider extends Provider {
       mcp_servers: [
         {
           url: this.mcpServer.url,
-          authorization_token: this.mcpServer.authorizationToken,
           name: this.mcpServer.name,
           type: "url",
+          ...(this.mcpServer.authorizationToken && { authorization_token: this.mcpServer.authorizationToken }),
         },
       ],
       betas: ["mcp-client-2025-04-04"],
