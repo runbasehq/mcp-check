@@ -119,9 +119,7 @@ export class OpenAIProvider extends Provider {
           require_approval: "never",
           server_label: this.mcpServer.name,
           server_url: this.mcpServer.url,
-          headers: {
-            Authorization: this.mcpServer.authorizationToken || "",
-          },
+          ...(this.mcpServer.authorizationToken && { headers: { Authorization: this.mcpServer.authorizationToken } }),
         },
       ],
       input: this.promptText,
