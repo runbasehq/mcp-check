@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.4.5
+
+### Patch Changes
+
+- Bump openai package version to support gpt-5 models
+
 ## 0.4.4
 
 ### Patch Changes

@@ -1,7 +1,7 @@
 {
   "name": "mcp-check",
   "module": "dist/src/index.js",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -22,7 +22,7 @@
     "dotenv": "^16.6.1",
     "glob": "^11.0.0",
     "ink": "^6.1.0",
-    "openai": "^5.10.1",
+    "openai": "^5.12.2",
     "react": "^19.1.1",
     "string-width": "^7.2.0",
     "zod": "^3.24.4"
