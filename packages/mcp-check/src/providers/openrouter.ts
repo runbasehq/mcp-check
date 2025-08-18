@@ -9,8 +9,11 @@ import type {
 
 import type { ProviderConfig } from "./types.js";
 import type { McpServer } from "../index.js";
-import type { StreamResult } from "src/chunks/types.js";
-import { connect } from "bun";
+import type {
+  StreamResult,
+  NormalizedChunk,
+  NormalizedChunkOpenAI,
+} from "../chunks/types.js";
 
 /**
  * Type alias for OpenRouter model names.
@@ -318,5 +321,117 @@ export class OpenRouterProvider extends Provider {
     } catch {
       return String(r as any);
     }
+  }
+
+  /**
+   * Normalizes OpenRouter-specific chunks into the unified NormalizedChunk format.
+   *
+   * This method converts OpenRouter's streaming response chunks into a standardized
+   * format that can be processed by the chunk handling system. Since OpenRouter
+   * uses the same API format as OpenAI, this implementation mirrors the OpenAI
+   * chunk normalization logic.
+   *
+   * @param chunk - The raw chunk from OpenRouter's streaming API
+   * @returns NormalizedChunk if the chunk can be normalized, null otherwise
+   */
+  protected normalizeChunk(chunk: any): NormalizedChunk | null {
+    const timestamp = Date.now();
+
+    if (chunk.type === "error") {
+      return {
+        provider: "openrouter",
+        timestamp,
+        index: -1,
+        type: "error",
+        data: { error: chunk.message },
+        originalChunk: chunk,
+      };
+    }
+
+    const baseChunk: Pick<
+      NormalizedChunkOpenAI,
+      "provider" | "timestamp" | "index" | "originalChunk"
+    > = {
+      provider: "openrouter",
+      timestamp,
+      index: chunk.output_index || 0,
+      originalChunk: chunk,
+    };
+
+    // text_start
+    if (
+      chunk.type === "response.content_part.added" &&
+      chunk.part?.type === "output_text"
+    ) {
+      return {
+        ...baseChunk,
+        type: "text_start",
+        data: {
+          text: "",
+        },
+      };
+    }
+
+    // text_delta
+    if (chunk.type === "response.output_text.delta") {
+      return {
+        ...baseChunk,
+        type: "text_delta",
+        data: {
+          textDelta: chunk.delta,
+        },
+      };
+    }
+
+    // tool_call_start
+    if (
+      chunk.type === "response.output_item.added" &&
+      chunk.item?.type === "mcp_call"
+    ) {
+      return {
+        ...baseChunk,
+        type: "tool_call_start",
+        data: {
+          toolName: chunk.item.name,
+          toolId: chunk.item.id,
+        },
+      };
+    }
+
+    // tool_call_delta
+    if (chunk.type === "response.mcp_call_arguments.delta") {
+      return {
+        ...baseChunk,
+        type: "tool_call_delta",
+        data: { toolDelta: chunk.delta },
+      };
+    }
+
+    // tool_result
+    if (
+      chunk.type === "response.output_item.done" &&
+      chunk.item?.type === "mcp_call"
+    ) {
+      return {
+        ...baseChunk,
+        type: "tool_result",
+        data: {
+          toolId: chunk.item.id,
+          isError: !!chunk.item.error,
+          toolResult: chunk.item.output,
+        },
+      };
+    }
+
+    // block_stop
+    if (chunk.type === "response.output_item.done") {
+      return {
+        ...baseChunk,
+        type: "block_stop",
+        data: {},
+      };
+    }
+
+    return null;
   }
 }
