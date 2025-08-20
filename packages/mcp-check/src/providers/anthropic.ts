@@ -1,12 +1,24 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Provider } from "./provider.js";
-import type { StreamResult, NormalizedChunk, NormalizedChunkAnthropic } from "../chunks/types.js";
+import type {
+  StreamResult,
+  NormalizedChunk,
+  NormalizedChunkAnthropic,
+} from "../chunks/types.js";
 import type { McpServer } from "../index.js";
 import type { ProviderConfig } from "./types.js";
-import type { BetaRawContentBlockDeltaEvent, BetaRawContentBlockStartEvent, BetaRawContentBlockStopEvent } from "@anthropic-ai/sdk/resources/beta.js";
+import type {
+  BetaRawContentBlockDeltaEvent,
+  BetaRawContentBlockStartEvent,
+  BetaRawContentBlockStopEvent,
+} from "@anthropic-ai/sdk/resources/beta.js";
 import type { BetaRateLimitError } from "@anthropic-ai/sdk/resources";
 
-type AnthropicChunk = BetaRawContentBlockDeltaEvent | BetaRawContentBlockStartEvent | BetaRawContentBlockStopEvent | BetaRateLimitError;
+type AnthropicChunk =
+  | BetaRawContentBlockDeltaEvent
+  | BetaRawContentBlockStartEvent
+  | BetaRawContentBlockStopEvent
+  | BetaRateLimitError;
 /**
  * Type alias for Anthropic model names.
  *
@@ -18,7 +30,14 @@ type AnthropicChunk = BetaRawContentBlockDeltaEvent | BetaRawContentBlockStartEv
  * const model: AnthropicModel = "claude-3-haiku-20240307";
  * ```
  */
-export type AnthropicModel = Anthropic.Model;
+
+type OnlyLiteralStrings<T> = T extends string
+  ? string extends T
+    ? never
+    : T
+  : never;
+
+export type AnthropicModel = OnlyLiteralStrings<Anthropic.Model>;
 
 /**
  * Provider for Anthropic Claude models.
@@ -129,7 +148,9 @@ export class AnthropicProvider extends Provider {
           url: this.mcpServer.url,
           name: this.mcpServer.name,
           type: "url",
-          ...(this.mcpServer.authorizationToken && { authorization_token: this.mcpServer.authorizationToken }),
+          ...(this.mcpServer.authorizationToken && {
+            authorization_token: this.mcpServer.authorizationToken,
+          }),
         },
       ],
       betas: ["mcp-client-2025-04-04"],
@@ -194,7 +215,6 @@ export class AnthropicProvider extends Provider {
     };
   }
 
-
   /**
    * Normalizes Anthropic-specific chunks into the unified NormalizedChunk format.
    *
@@ -227,16 +247,20 @@ export class AnthropicProvider extends Provider {
       };
     }
 
-    const baseChunk: Pick<NormalizedChunkAnthropic, "provider" | "timestamp" | "index" | "originalChunk"> = {
+    const baseChunk: Pick<
+      NormalizedChunkAnthropic,
+      "provider" | "timestamp" | "index" | "originalChunk"
+    > = {
       provider: "anthropic",
       timestamp,
       index: chunk.index,
       originalChunk: chunk,
     };
 
-
-
-    if (chunk.type === "content_block_start" && chunk.content_block.type === "text") {
+    if (
+      chunk.type === "content_block_start" &&
+      chunk.content_block.type === "text"
+    ) {
       return {
         ...baseChunk,
         type: "text_start",
@@ -246,7 +270,10 @@ export class AnthropicProvider extends Provider {
       };
     }
 
-    if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+    if (
+      chunk.type === "content_block_delta" &&
+      chunk.delta.type === "text_delta"
+    ) {
       if (!this.config.silent) {
         process.stdout.write(
           JSON.stringify({
@@ -260,7 +287,7 @@ export class AnthropicProvider extends Provider {
         ...baseChunk,
         type: "text_delta",
         data: { textDelta: chunk.delta.text },
-      }
+      };
     }
 
     if (
@@ -287,7 +314,10 @@ export class AnthropicProvider extends Provider {
       };
     }
 
-    if (chunk.type === "content_block_delta" && chunk.delta.type === "input_json_delta") {
+    if (
+      chunk.type === "content_block_delta" &&
+      chunk.delta.type === "input_json_delta"
+    ) {
       return {
         ...baseChunk,
         type: "tool_call_delta",
@@ -297,7 +327,10 @@ export class AnthropicProvider extends Provider {
       };
     }
 
-    if (chunk.type === "content_block_start" && chunk.content_block.type === "mcp_tool_result") {
+    if (
+      chunk.type === "content_block_start" &&
+      chunk.content_block.type === "mcp_tool_result"
+    ) {
       return {
         ...baseChunk,
         type: "tool_result",
@@ -306,12 +339,10 @@ export class AnthropicProvider extends Provider {
           isError: chunk.content_block.is_error,
           toolResult: chunk.content_block.content,
         },
-      }
+      };
     }
 
-    if (
-      chunk.type === "content_block_stop"
-    ) {
+    if (chunk.type === "content_block_stop") {
       if (!this.config.silent) {
         process.stdout.write(
           JSON.stringify({

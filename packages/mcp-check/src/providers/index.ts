@@ -56,8 +56,8 @@ export type { OpenRouterModel } from "./openrouter.js";
  * ```
  */
 export type ModelName =
-  | `anthropic/${AnthropicModel}`
   | `openai/${OpenAIModel}`
+  | `anthropic/${AnthropicModel}`
   | `openrouter/${OpenRouterModel}`;
 
 /**

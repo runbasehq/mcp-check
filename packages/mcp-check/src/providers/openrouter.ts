@@ -40,20 +40,20 @@ type AccToolCall = {
 };
 
 /**
- * Provider for OpenAI models.
+ * Provider for OpenRouter models.
  *
- * This class handles interactions with OpenAI's models through their
+ * This class handles interactions with OpenRouter models through their
  * official SDK. It supports streaming responses, MCP tool calls,
  * and chunk normalization for the OpenAI API format.
  *
  * @example
  * ```typescript
- * const provider = new OpenAIProvider(mcpServer, "What tools are available?", {
- *   openaiApiKey: process.env.OPENAI_API_KEY,
+ * const provider = new OpenRouterProvider(mcpServer, "What tools are available?", {
+ *   openrouterApiKey: process.env.OPENROUTER_API_KEY,
  *   silent: true
  * });
  *
- * const result = await provider.stream("gpt-4");
+ * const result = await provider.stream("z-ai/glm-4.5-air:free");
  * console.log("Content:", result.content);
  * console.log("Used tools:", result.usedTools);
  * ```
@@ -71,16 +71,16 @@ export class OpenRouterProvider extends Provider {
   private currentModel: string = "";
 
   /**
-   * Creates a new OpenAIProvider instance.
+   * Creates a new OpenRouterProvider instance.
    *
    * @param mcpServer - The MCP server configuration
-   * @param promptText - The prompt text to send to the OpenAI model
+   * @param promptText - The prompt text to send to the OpenRouter model
    * @param config - Optional provider configuration including API key
    *
    * @example
    * ```typescript
-   * const provider = new OpenAIProvider(mcpServer, "Hello GPT!", {
-   *   openaiApiKey: process.env.OPENAI_API_KEY,
+   * const provider = new OpenRouterProvider(mcpServer, "Hello!", {
+   *   openrouterApiKey: process.env.OPENROUTER_API_KEY,
    *   silent: false,
    *   chunkHandlers: {
    *     onTextDelta: (data) => console.log("Text:", data.text)
@@ -94,36 +94,42 @@ export class OpenRouterProvider extends Provider {
     config: ProviderConfig = {},
   ) {
     super(mcpServer, promptText, config);
-    const apiKey = config.openaiApiKey || process.env.OPENAI_API_KEY;
-    this.client = apiKey ? new OpenAI({ apiKey }) : null;
+    const apiKey = config.openrouterApiKey || process.env.OPENROUTER_API_KEY;
+    if (!apiKey)
+      throw new Error(
+        "Please set OPENROUTER_API_KEY environment variable or pass openrouterApiKey in config.",
+      );
+    this.client = apiKey
+      ? new OpenAI({
+          apiKey,
+          baseURL: "https://openrouter.ai/api/v1",
+          timeout: 60_000,
+        })
+      : null;
   }
 
   /**
-   * Streams a response from the specified OpenAI model.
+   * Streams a response from the specified OpenRouter model.
    *
-   * This method establishes a streaming connection to the OpenAI API,
+   * This method establishes a streaming connection to the OpenRouter API,
    * processes the response chunks, tracks tool usage, and returns the
    * final result with content and tool call information.
    *
-   * @param model - The OpenAI model name to use (e.g., "gpt-4", "gpt-3.5-turbo")
+   * @param model - The OpenRouter model name to use (e.g., "z-ai/glm-4.5-air:free")
    * @returns Promise that resolves to a StreamResult containing the response
    *
-   * @throws {Error} When the OpenAI client is not initialized (missing API key)
+   * @throws {Error} When the OpenRouter client is not initialized (missing API key)
    *
    * @example
    * ```typescript
-   * const result = await provider.stream("gpt-4");
+   * const result = await provider.stream("z-ai/glm-4.5-air:free");
    * console.log("Final content:", result.content);
    * console.log("Tools used:", result.usedTools);
    * console.log("Tool calls:", result.toolCalls);
    * ```
    */
   async stream(model: string): Promise<StreamResult> {
-    if (!this.client) {
-      throw new Error(
-        "OpenAI client not initialized. Please set OPENAI_API_KEY environment variable or pass openaiApiKey in config.",
-      );
-    }
+    if (!this.client) throw new Error("OpenRouter client not initialized.");
 
     this.usedTools = [];
     this.toolCalls = {};
@@ -131,103 +137,172 @@ export class OpenRouterProvider extends Provider {
     this.currentModel = model;
 
     const mcp = await this.connectMcp();
-
     const tools = await this.listAndConvertTools(mcp);
 
-    const openrouter = new OpenAI({
-      apiKey: process.env.OPENROUTER_API_KEY! ?? this.config.openrouterApiKey,
-      baseURL: "https://openrouter.ai/api/v1",
-      timeout: 60_000,
-    });
-
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      {
-        role: "user",
-        content: this.promptText,
-      },
+      { role: "user", content: this.promptText },
     ];
 
-    const stream = await openrouter.chat.completions.create({
-      model: model.replace("openrouter/", ""),
-      messages,
-      tools,
-      tool_choice: "auto",
-      temperature: 0,
-      stream: true,
-    });
+    const MAX_ITERATIONS = 10000;
 
-    if (!this.config.silent) {
-      process.stdout.write(
-        JSON.stringify({
-          type: "model_stream",
-          model: model,
-          text: `Starting ${model} execution...\n`,
-        }) + "\n",
+    for (let round = 1; round <= MAX_ITERATIONS; round++) {
+      const acc = { content: "", tool_calls: [] as AccToolCall[] };
+
+      const stream = await this.withBackoff(
+        () =>
+          this.client!.chat.completions.create({
+            model: model.replace("openrouter/", ""),
+            messages,
+            tools,
+            tool_choice: "auto",
+            temperature: 0,
+            stream: true,
+          }),
+        { retries: 5, base: 600 },
       );
-    }
 
-    const acc = { content: "", tool_calls: [] as AccToolCall[] };
+      for await (const chunk of stream) {
+        const delta = chunk?.choices?.[0]?.delta;
+        if (delta) {
+          this.accumulateDelta(acc, delta);
 
-    for await (const chunk of stream) {
-      // log de chunk crudo
-      console.log("[CHUNK]", JSON.stringify(chunk, null, 2));
-      const delta = chunk?.choices?.[0]?.delta;
-      if (delta) this.accumulateDelta(acc, delta);
-      // await this.processChunk(chunk);
-    }
-
-    const tcalls = acc.tool_calls ?? [];
-    console.log(`[LLM] Got ${tcalls.length} tool call(s).`);
-
-    messages.push({
-      role: "assistant",
-      content: acc.content || "",
-      tool_calls: tcalls.map((t, index) => ({
-        id: t.id ?? `call_${index}`,
-        type: "function",
-        function: {
-          name: t.function?.name ?? "",
-          arguments: t.function?.arguments ?? "{}",
-        },
-      })),
-    } as any);
-
-    for (const [i, call] of tcalls.entries()) {
-      const id = call.id ?? `call_${i}`;
-      const name = call.function?.name ?? "";
-      const argsStr = call.function?.arguments ?? "{}";
-      let args: Record<string, any> = {};
-      try {
-        args = JSON.parse(argsStr);
-      } catch {
-        // algunos modelos envían JSON parcial → último intento
-        try {
-          args = JSON.parse(
-            argsStr.replace(/}\s*$/, "}}").replace(/^{\s*$/, "{}"),
-          );
-        } catch {}
+          if (delta.content && !this.config.silent) {
+            process.stdout.write(
+              JSON.stringify({
+                type: "model_stream",
+                model: this.currentModel,
+                text: delta.content,
+              }) + "\n",
+            );
+          }
+        }
       }
 
-      console.log(`[MCP] Executing tool '${name}' with args:`, args);
-      try {
-        const result = await mcp.callTool({ name, arguments: args });
-        messages.push({
-          role: "tool",
-          tool_call_id: id,
-          content: this.renderToolResult(result as any),
-        });
-      } catch (err: any) {
-        console.error("[MCP] Tool error:", err?.message ?? err);
-        messages.push({
-          role: "tool",
-          tool_call_id: id,
-          content: JSON.stringify({ error: String(err?.message ?? err) }),
-        });
+      const tcalls = acc.tool_calls ?? [];
+
+      if (!tcalls.length) {
+        await mcp.close();
+        return {
+          usedTools: this.usedTools,
+          content: this.content || acc.content,
+          toolCalls: this.toolCalls,
+        };
+      }
+
+      const assistantWithCalls = {
+        role: "assistant" as const,
+        content: acc.content || "",
+        tool_calls: tcalls.map((t, i) => ({
+          id: t.id ?? `call_${i}`,
+          type: "function" as const,
+          function: {
+            name: t.function?.name ?? "",
+            arguments: t.function?.arguments ?? "{}",
+          },
+        })),
+      };
+      if (!this.config.silent && assistantWithCalls) {
+        process.stdout.write(
+          "[ASSISTANT tool_calls]" +
+            JSON.stringify(assistantWithCalls, null, 2),
+        );
+      }
+      messages.push(assistantWithCalls as any);
+
+      for (const [i, call] of tcalls.entries()) {
+        const id = call.id ?? `call_${i}`;
+        const name = call.function?.name ?? "";
+        const argsStr = call.function?.arguments ?? "{}";
+        let args: Record<string, any> = {};
+        try {
+          args = JSON.parse(argsStr);
+        } catch {}
+
+        this.usedTools.push(name);
+        const toolCallEntry = {
+          id,
+          args,
+          round,
+          ts: Date.now(),
+          result: undefined as any,
+        };
+        (this.toolCalls[name] ??= []).push(toolCallEntry);
+
+        try {
+          // Notify CLI that tool is starting
+          if (!this.config.silent) {
+            process.stdout.write(
+              JSON.stringify({
+                type: "model_stream",
+                model: this.currentModel,
+                text: `Calling tool: ${name}\n`,
+              }) + "\n",
+            );
+          }
+
+          const result = await mcp.callTool({ name, arguments: args });
+          toolCallEntry.result = result;
+
+          // Notify CLI that tool completed
+          if (!this.config.silent) {
+            process.stdout.write(
+              JSON.stringify({
+                type: "model_stream",
+                model: this.currentModel,
+                text: `Tool ${name} completed\n`,
+              }) + "\n",
+            );
+          }
+
+          const toolMsg = {
+            role: "tool" as const,
+            tool_call_id: id,
+            content: this.renderToolResult(result as any),
+          };
+          messages.push(toolMsg);
+        } catch (err: any) {
+          // Notify CLI about tool error
+          if (!this.config.silent) {
+            process.stdout.write(
+              JSON.stringify({
+                type: "model_stream",
+                model: this.currentModel,
+                text: `Tool ${name} failed: ${err?.message ?? err}\n`,
+              }) + "\n",
+            );
+          }
+
+          const errorResult = { error: String(err?.message ?? err) };
+          toolCallEntry.result = errorResult;
+          const toolErr = {
+            role: "tool" as const,
+            tool_call_id: id,
+            content: JSON.stringify(errorResult),
+          };
+          messages.push(toolErr);
+        }
+      }
+
+      if (round === MAX_ITERATIONS) {
+        if (!this.config.silent) {
+          process.stdout.write(
+            JSON.stringify({
+              type: "model_stream",
+              model: this.currentModel,
+              text: `Reached MAX_ITERATIONS ${MAX_ITERATIONS} without final answer.\n`,
+            }) + "\n",
+          );
+        }
+        await mcp.close();
+        return {
+          usedTools: this.usedTools,
+          content: this.content,
+          toolCalls: this.toolCalls,
+        };
       }
     }
 
     await mcp.close();
-
     return {
       usedTools: this.usedTools,
       content: this.content,
@@ -235,13 +310,100 @@ export class OpenRouterProvider extends Provider {
     };
   }
 
-  async listAndConvertTools(mcp: Client) {
-    console.log("[MCP] Listing tools...");
-    const listed = await mcp.listTools();
-    console.log(`[MCP] Tools available: ${listed.tools.length}`);
-    return listed.tools.map(this.convertTool);
+  /**
+   * Executes a function with exponential backoff retry logic.
+   *
+   * This method implements a robust retry mechanism for handling transient failures,
+   * particularly useful for API calls that may fail due to rate limits or temporary
+   * server issues. The backoff strategy uses exponential delays with optional jitter
+   * to prevent thundering herd problems.
+   *
+   * @param fn - The async function to execute with retry logic
+   * @param options - Configuration options for the backoff behavior
+   * @param options.retries - Maximum number of retry attempts (default: 5)
+   * @param options.base - Base delay in milliseconds for the first retry (default: 500)
+   * @param options.factor - Multiplier for exponential backoff (default: 2)
+   * @param options.jitter - Whether to add random jitter to delays (default: true)
+   * @param options.isRetryable - Function to determine if an error should trigger a retry
+   * @param options.onRetry - Callback function called on each retry attempt
+   * @returns Promise that resolves with the function result or rejects with the final error
+   *
+   * @throws {Error} When all retry attempts are exhausted or the error is not retryable
+   *
+   * @example
+   * ```typescript
+   * const result = await provider.withBackoff(
+   *   () => api.createCompletion(params),
+   *   { retries: 3, base: 1000 }
+   * );
+   * ```
+   */
+  async withBackoff<T>(
+    fn: () => Promise<T>,
+    {
+      retries = 5,
+      base = 500,
+      factor = 2,
+      jitter = true,
+      isRetryable = (e: any) =>
+        e?.status === 429 ||
+        e?.status === 529 ||
+        /Provider returned error/i.test(String(e?.message)),
+      onRetry = (e: any, attempt: number, delay: number) => {
+        if (!this.config.silent) {
+          process.stdout.write(
+            JSON.stringify({
+              type: "model_stream",
+              model: this.currentModel,
+              text: `[LLM] retry ${attempt}/${retries} in ${delay}ms: ${e?.status || ""} ${e?.message || e}\n`,
+            }) + "\n",
+          );
+        }
+      },
+    } = {},
+  ): Promise<T> {
+    let attempt = 0;
+    while (true) {
+      try {
+        return await fn();
+      } catch (e: any) {
+        attempt++;
+        if (attempt > retries || !isRetryable(e)) throw e;
+        const delay = Math.min(10_000, base * Math.pow(factor, attempt - 1));
+        const wait = jitter ? Math.floor(delay * (0.5 + Math.random())) : delay;
+        onRetry(e, attempt, wait);
+
+        await new Promise((res) => setTimeout(res, wait));
+      }
+    }
   }
 
+  /**
+   * Lists available MCP tools and converts them to OpenAI function format.
+   *
+   * @param mcp - The connected MCP client
+   * @returns Array of tools formatted for OpenAI API
+   */
+  async listAndConvertTools(mcp: Client) {
+    const listed = await mcp.listTools();
+    if (!this.config.silent) {
+      process.stdout.write(
+        JSON.stringify({
+          type: "model_stream",
+          model: this.currentModel,
+          text: `[MCP] Tools available: ${listed.tools.length}\n`,
+        }) + "\n",
+      );
+    }
+    return listed.tools.map((t) => this.convertTool(t));
+  }
+
+  /**
+   * Converts an MCP tool to OpenAI function format.
+   *
+   * @param tool - The MCP tool to convert
+   * @returns OpenAI-formatted function definition
+   */
   convertTool(tool: ListToolsResult["tools"][number]) {
     const inputSchema =
       tool.inputSchema ??
@@ -261,6 +423,12 @@ export class OpenRouterProvider extends Provider {
     };
   }
 
+  /**
+   * Establishes a connection to the MCP server.
+   *
+   * @returns Promise that resolves to a connected MCP client
+   * @throws {Error} When authorization token is missing
+   */
   async connectMcp(): Promise<Client> {
     if (!this.mcpServer.authorizationToken)
       throw new Error("Missing authorization token");
@@ -276,18 +444,35 @@ export class OpenRouterProvider extends Provider {
       },
     );
     const mcp = new Client({ name: "openrouter-agent", version: "1.0.0" });
-    console.log(`[MCP] Connecting to ${this.mcpServer.url} ...`);
     await mcp.connect(transport);
-    console.log("[MCP] Connected.");
+    if (!this.config.silent) {
+      process.stdout.write(
+        JSON.stringify({
+          type: "model_stream",
+          model: this.currentModel,
+          text: "[MCP] Connected to server\n",
+        }) + "\n",
+      );
+    }
     return mcp;
   }
 
+  /**
+   * Accumulates streaming delta changes from OpenRouter responses.
+   *
+   * @param acc - The accumulator object for content and tool calls
+   * @param delta - The delta object from the streaming response
+   * @returns The updated accumulator object
+   */
   accumulateDelta(
     acc: { content: string; tool_calls: AccToolCall[] },
     delta: any,
   ) {
     const piece = delta?.content;
-    if (typeof piece === "string") acc.content += piece;
+    if (typeof piece === "string") {
+      acc.content += piece;
+      this.content += piece;
+    }
 
     const tcalls = delta?.tool_calls as any[] | undefined;
     if (tcalls && tcalls.length) {
@@ -315,6 +500,12 @@ export class OpenRouterProvider extends Provider {
     return acc;
   }
 
+  /**
+   * Renders a tool call result as a string for the conversation.
+   *
+   * @param r - The tool call result to render
+   * @returns String representation of the result
+   */
   renderToolResult(r: CallToolResult): string {
     try {
       return JSON.stringify(r, null, 2);
@@ -354,14 +545,14 @@ export class OpenRouterProvider extends Provider {
     > = {
       provider: "openrouter",
       timestamp,
-      index: chunk.output_index || 0,
+      index: chunk.output_index,
       originalChunk: chunk,
     };
 
     // text_start
     if (
       chunk.type === "response.content_part.added" &&
-      chunk.part?.type === "output_text"
+      chunk.part.type === "output_text"
     ) {
       return {
         ...baseChunk,
@@ -386,7 +577,7 @@ export class OpenRouterProvider extends Provider {
     // tool_call_start
     if (
       chunk.type === "response.output_item.added" &&
-      chunk.item?.type === "mcp_call"
+      chunk.item.type === "mcp_call"
     ) {
       return {
         ...baseChunk,
@@ -410,14 +601,14 @@ export class OpenRouterProvider extends Provider {
     // tool_result
     if (
       chunk.type === "response.output_item.done" &&
-      chunk.item?.type === "mcp_call"
+      chunk.item.type === "mcp_call"
     ) {
       return {
         ...baseChunk,
         type: "tool_result",
         data: {
           toolId: chunk.item.id,
-          isError: !!chunk.item.error,
+          isError: !chunk.item.error,
           toolResult: chunk.item.output,
         },
       };

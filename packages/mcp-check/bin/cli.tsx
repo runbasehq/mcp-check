@@ -64,7 +64,7 @@ class SimpleLogBatcher {
 const runJestCommand = (
   jestTasks: string[],
   onTaskUpdate: (updatedTasks: Task[]) => void,
-  initialTasks: Task[]
+  initialTasks: Task[],
 ): Promise<void> => {
   return new Promise((resolve) => {
     const tasks = new Map<string, Task>();
@@ -77,7 +77,7 @@ const runJestCommand = (
 
     const logBatcher = new SimpleLogBatcher(() => {
       const sortedTasks = Array.from(tasks.values()).sort(
-        (a, b) => a.orderIndex - b.orderIndex
+        (a, b) => a.orderIndex - b.orderIndex,
       );
       onTaskUpdate([...sortedTasks]);
     });
@@ -95,7 +95,7 @@ const runJestCommand = (
 
     const updateTaskStatus = (
       taskName: string,
-      status: "running" | "completed" | "failed"
+      status: "running" | "completed" | "failed",
     ) => {
       const task = tasks.get(taskName);
       if (task) {
@@ -145,7 +145,7 @@ const runJestCommand = (
       {
         stdio: "pipe",
         env: { ...process.env, FORCE_COLOR: "1" },
-      }
+      },
     );
 
     jestTasks.forEach((taskName) => {
@@ -285,7 +285,7 @@ const padToWidth = (str: string, width: number): string => {
 
 const getStatusIndicator = (
   status: "running" | "completed" | "failed",
-  frame: number
+  frame: number,
 ): string => {
   if (status === "running") {
     const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -338,7 +338,7 @@ const TaskManager = () => {
           (updatedTasks) => {
             setTasks(updatedTasks);
           },
-          initialTasks
+          initialTasks,
         );
       } catch (error) {
         console.error("Failed to initialize:", error);
@@ -421,7 +421,7 @@ const TaskManager = () => {
           {logs
             .slice(
               uiState.scrollPosition,
-              uiState.scrollPosition + (terminalHeight - 6)
+              uiState.scrollPosition + (terminalHeight - 6),
             )
             .map((entry, i) => (
               <Box key={`log-${i + uiState.scrollPosition}`} marginTop={1}>
@@ -446,10 +446,10 @@ const TaskManager = () => {
 
   const rightLines: string[] = [];
   rightLines.push(
-    `${currentTask?.name || "No task"} - ${currentTask?.status || "Loading..."}`
+    `${currentTask?.name || "No task"} - ${currentTask?.status || "Loading..."}`,
   );
   rightLines.push(
-    `Logs: ${currentTask?.logs.length || 0} entries | Press Enter to view details`
+    `Logs: ${currentTask?.logs.length || 0} entries | Press Enter to view details`,
   );
   rightLines.push("");
 
