@@ -5,7 +5,7 @@ import { AnthropicProvider } from "./anthropic.js";
 import { OpenAIProvider } from "./openai.js";
 import type { ProviderConfig } from "./types.js";
 import { Provider } from "./provider.js";
-import { type OpenRouterModel } from "./openrouter.js";
+import { OpenRouterProvider, type OpenRouterModel } from "./openrouter.js";
 
 /**
  * @fileoverview Provider factory and type exports for MCP AI providers.
@@ -56,8 +56,8 @@ export type { OpenRouterModel } from "./openrouter.js";
  * ```
  */
 export type ModelName =
-  | `anthropic/${AnthropicModel}`
   | `openai/${OpenAIModel}`
+  | `anthropic/${AnthropicModel}`
   | `openrouter/${OpenRouterModel}`;
 
 /**
@@ -122,6 +122,7 @@ export function createProvider(
   }
 
   if (model.startsWith("openrouter/")) {
+    return new OpenRouterProvider(mcpServer, promptText, config);
   }
 
   throw new Error(`Error: unknown provider for model: ${model}.`);
