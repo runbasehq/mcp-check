@@ -1,5 +1,13 @@
 # mcp-testing-library
 
+## 0.4.7
+
+### Patch Changes
+
+- Add OpenRouter provider:
+  - Free models available for testing at no cost
+  - Retries added to handle common `429` and `529` errors on free models
+
 ## 0.4.6
 
 ### Patch Changes
