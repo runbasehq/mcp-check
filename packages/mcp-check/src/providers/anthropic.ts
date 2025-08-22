@@ -13,6 +13,7 @@ import type {
   BetaRawContentBlockStopEvent,
 } from "@anthropic-ai/sdk/resources/beta.js";
 import type { BetaRateLimitError } from "@anthropic-ai/sdk/resources";
+import { nanoid } from "../utils/nanoid.js";
 
 type AnthropicChunk =
   | BetaRawContentBlockDeltaEvent
@@ -33,8 +34,8 @@ type AnthropicChunk =
 
 type OnlyLiteralStrings<T> = T extends string
   ? string extends T
-    ? never
-    : T
+  ? never
+  : T
   : never;
 
 export type AnthropicModel = OnlyLiteralStrings<Anthropic.Model>;
@@ -71,6 +72,8 @@ export class AnthropicProvider extends Provider {
   private content: string = "";
   /** Current model being used for the request */
   private currentModel: string = "";
+  /** Unique execution ID for this streaming session */
+  private executionId: string = "";
 
   /**
    * Creates a new AnthropicProvider instance.
@@ -132,6 +135,7 @@ export class AnthropicProvider extends Provider {
     this.currentToolName = null;
     this.content = "";
     this.currentModel = model;
+    this.executionId = nanoid();
 
     const stream = this.client.beta.messages.stream({
       model: model.replace("anthropic/", "") as Anthropic.Model,
@@ -236,9 +240,12 @@ export class AnthropicProvider extends Provider {
   protected normalizeChunk(chunk: AnthropicChunk): NormalizedChunk | null {
     const timestamp = Date.now();
 
+    console.log(chunk);
+
     if (chunk.type === "rate_limit_error") {
       return {
         provider: "anthropic",
+        executionId: this.executionId,
         timestamp,
         index: -1,
         type: "error",
@@ -249,9 +256,10 @@ export class AnthropicProvider extends Provider {
 
     const baseChunk: Pick<
       NormalizedChunkAnthropic,
-      "provider" | "timestamp" | "index" | "originalChunk"
+      "provider" | "executionId" | "timestamp" | "index" | "originalChunk"
     > = {
       provider: "anthropic",
+      executionId: this.executionId,
       timestamp,
       index: chunk.index,
       originalChunk: chunk,
