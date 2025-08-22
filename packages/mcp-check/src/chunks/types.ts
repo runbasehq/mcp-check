@@ -244,6 +244,8 @@ export type NormalizedChunkType =
 export interface BaseNormalizedChunk {
   /** The type of chunk being processed */
   type: NormalizedChunkType;
+  /** Unique execution ID for this streaming session */
+  executionId: string;
   /** Timestamp when the chunk was received */
   timestamp: number;
   /** Index of the chunk within the stream */
