@@ -4,6 +4,7 @@ import { Provider } from "./provider.js";
 import type { StreamResult, NormalizedChunk, NormalizedChunkOpenAI } from "../chunks/types.js";
 import type { ProviderConfig } from "./types.js";
 import type { McpServer } from "../index.js";
+import { nanoid } from "../utils/nanoid.js";
 
 type OpenAIChunk = Responses.ResponseOutputItemDoneEvent | Responses.ResponseContentPartAddedEvent | Responses.ResponseTextDeltaEvent | Responses.ResponseMcpCallArgumentsDeltaEvent | Responses.ResponseOutputItemAddedEvent | Responses.ResponseErrorEvent;
 
@@ -50,6 +51,8 @@ export class OpenAIProvider extends Provider {
   private content: string = "";
   /** Current model being used for the request */
   private currentModel: string = "";
+  /** Unique execution ID for this streaming session */
+  private executionId: string = "";
 
   /**
    * Creates a new OpenAIProvider instance.
@@ -110,6 +113,7 @@ export class OpenAIProvider extends Provider {
     this.toolCalls = {};
     this.content = "";
     this.currentModel = model;
+    this.executionId = nanoid();
 
     const response = await this.client.responses.create({
       model: model.replace("openai/", "") as ChatModel,
@@ -203,6 +207,7 @@ export class OpenAIProvider extends Provider {
     if (chunk.type === "error") {
       return {
         provider: "openai",
+        executionId: this.executionId,
         timestamp,
         index: -1,
         type: "error",
@@ -211,8 +216,9 @@ export class OpenAIProvider extends Provider {
       };
     }
 
-    const baseChunk: Pick<NormalizedChunkOpenAI, "provider" | "timestamp" | "index" | "originalChunk"> = {
+    const baseChunk: Pick<NormalizedChunkOpenAI, "provider" | "executionId" | "timestamp" | "index" | "originalChunk"> = {
       provider: "openai",
+      executionId: this.executionId,
       timestamp,
       index: chunk.output_index,
       originalChunk: chunk,

@@ -14,6 +14,7 @@ import type {
   NormalizedChunk,
   NormalizedChunkOpenAI,
 } from "../chunks/types.js";
+import { nanoid } from "../utils/nanoid.js";
 
 /**
  * Type alias for OpenRouter model names.
@@ -69,6 +70,8 @@ export class OpenRouterProvider extends Provider {
   private content: string = "";
   /** Current model being used for the request */
   private currentModel: string = "";
+  /** Unique execution ID for this streaming session */
+  private executionId: string = "";
 
   /**
    * Creates a new OpenRouterProvider instance.
@@ -135,6 +138,7 @@ export class OpenRouterProvider extends Provider {
     this.toolCalls = {};
     this.content = "";
     this.currentModel = model;
+    this.executionId = nanoid();
 
     const mcp = await this.connectMcp();
     const tools = await this.listAndConvertTools(mcp);
@@ -531,6 +535,7 @@ export class OpenRouterProvider extends Provider {
     if (chunk.type === "error") {
       return {
         provider: "openrouter",
+        executionId: this.executionId,
         timestamp,
         index: -1,
         type: "error",
@@ -541,9 +546,10 @@ export class OpenRouterProvider extends Provider {
 
     const baseChunk: Pick<
       NormalizedChunkOpenAI,
-      "provider" | "timestamp" | "index" | "originalChunk"
+      "provider" | "executionId" | "timestamp" | "index" | "originalChunk"
     > = {
       provider: "openrouter",
+      executionId: this.executionId,
       timestamp,
       index: chunk.output_index,
       originalChunk: chunk,
