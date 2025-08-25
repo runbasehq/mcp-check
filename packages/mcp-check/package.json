@@ -17,15 +17,19 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.6",
+    "@ai-sdk/openai": "^2.0.20",
     "@anthropic-ai/sdk": "^0.56.0",
     "@modelcontextprotocol/sdk": "^1.16.0",
+    "@openrouter/ai-sdk-provider": "^1.1.2",
+    "ai": "^5.0.22",
     "dotenv": "^16.6.1",
     "glob": "^11.0.0",
     "ink": "^6.1.0",
     "openai": "^5.12.2",
     "react": "^19.1.1",
     "string-width": "^7.2.0",
-    "zod": "^3.24.4"
+    "zod": "^4.0.13"
   },
   "description": "",
   "exports": {
