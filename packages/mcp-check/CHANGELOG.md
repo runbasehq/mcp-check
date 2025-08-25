@@ -1,5 +1,11 @@
 # mcp-testing-library
 
+## 0.4.9
+
+### Patch Changes
+
+- refactor: move all providers under ai-sdk provider
+
 ## 0.4.8
 
 ### Patch Changes
