@@ -248,8 +248,6 @@ export interface BaseNormalizedChunk {
   executionId: string;
   /** Timestamp when the chunk was received */
   timestamp: number;
-  /** Index of the chunk within the stream */
-  index: number;
   /** The normalized data payload for this chunk */
   data: {
     /** Error message for error chunks */
@@ -264,8 +262,7 @@ export interface NormalizedTextDeltaChunk extends BaseNormalizedChunk {
   data: {
     /** Text content for text-related chunks */
     textDelta: string;
-
-  }
+  };
 }
 
 export interface NormalizedToolCallStartChunk extends BaseNormalizedChunk {
@@ -275,7 +272,7 @@ export interface NormalizedToolCallStartChunk extends BaseNormalizedChunk {
     toolId: string;
     /** Name of the tool for tool-related chunks */
     toolName: string;
-  }
+  };
 }
 
 export interface NormalizedToolCallDeltaChunk extends BaseNormalizedChunk {
@@ -283,7 +280,7 @@ export interface NormalizedToolCallDeltaChunk extends BaseNormalizedChunk {
   data: {
     /** Text content for tool-related chunks */
     toolDelta: string;
-  }
+  };
 }
 
 export interface NormalizedTextStartChunk extends BaseNormalizedChunk {
@@ -291,7 +288,7 @@ export interface NormalizedTextStartChunk extends BaseNormalizedChunk {
   data: {
     /** Initial text content */
     text?: string;
-  }
+  };
 }
 
 export interface NormalizedToolResultChunk extends BaseNormalizedChunk {
@@ -300,12 +297,12 @@ export interface NormalizedToolResultChunk extends BaseNormalizedChunk {
     toolId: string;
     isError: boolean;
     toolResult: any;
-  }
+  };
 }
 
 export interface NormalizedBlockStopChunk extends BaseNormalizedChunk {
   type: "block_stop";
-  data: {}
+  data: {};
 }
 
 export interface NormalizedErrorChunk extends BaseNormalizedChunk {
@@ -315,7 +312,7 @@ export interface NormalizedErrorChunk extends BaseNormalizedChunk {
     error: string;
     /** Error code if available */
     errorCode?: string;
-  }
+  };
 }
 
 /**
@@ -335,17 +332,30 @@ export type AgnosticNormalizedChunk =
   | NormalizedBlockStopChunk
   | NormalizedErrorChunk;
 
-export type NormalizedChunkAnthropic = (AgnosticNormalizedChunk & {
+export type NormalizedChunkAnthropic = AgnosticNormalizedChunk & {
   provider: "anthropic";
   originalChunk: BetaRawMessageStreamEvent | BetaRateLimitError;
-});
+};
 
-export type NormalizedChunkOpenAI = (AgnosticNormalizedChunk & {
+export type NormalizedChunkOpenAI = AgnosticNormalizedChunk & {
   provider: "openai" | "openrouter";
-  originalChunk: Responses.ResponseOutputItemAddedEvent | Responses.ResponseOutputItemDoneEvent | Responses.ResponseStreamEvent | Responses.ResponseOutputItem | Responses.ResponseOutputItemDoneEvent;
-});
+  originalChunk:
+    | Responses.ResponseOutputItemAddedEvent
+    | Responses.ResponseOutputItemDoneEvent
+    | Responses.ResponseStreamEvent
+    | Responses.ResponseOutputItem
+    | Responses.ResponseOutputItemDoneEvent;
+};
 
-export type NormalizedChunk = NormalizedChunkAnthropic | NormalizedChunkOpenAI;
+export type NormalizedChunkAISDK = AgnosticNormalizedChunk & {
+  provider: "aisdk";
+  originalChunk: any;
+};
+
+export type NormalizedChunk =
+  | NormalizedChunkAnthropic
+  | NormalizedChunkOpenAI
+  | NormalizedChunkAISDK;
 
 /**
  * Generic callback function for handling any normalized chunk.
@@ -384,7 +394,9 @@ export type ChunkCallback = (chunk: NormalizedChunk) => void | Promise<void>;
  * };
  * ```
  */
-export type ChunkTypeCallback<T extends AgnosticNormalizedChunk = AgnosticNormalizedChunk> = (data: T["data"]) => void | Promise<void>;
+export type ChunkTypeCallback<
+  T extends AgnosticNormalizedChunk = AgnosticNormalizedChunk,
+> = (data: T["data"]) => void | Promise<void>;
 
 /**
  * Configuration object for chunk handlers.
